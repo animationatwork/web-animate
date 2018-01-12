@@ -1,0 +1,28 @@
+{
+    "compilerOptions": {
+        "allowUnreachableCode": false,
+        "allowUnusedLabels": false,
+        "declaration": false,
+        "forceConsistentCasingInFileNames": true,
+        "inlineSourceMap": false,
+        "module": "commonjs",
+        "newLine": "LF",
+        "noEmit": true,
+        "noFallthroughCasesInSwitch": true, 
+        "noUnusedLocals": true,        
+        "preserveConstEnums": false,
+        "removeComments": false,
+        "skipLibCheck": true,
+        "sourceMap": false, 
+        "suppressImplicitAnyIndexErrors": true,
+        "target": "es5"
+    },
+    "exclude": [
+        "dist",
+        "tests",
+        "lib",
+        "lib.es2015",
+        "node_modules",
+        "types"
+    ]
+}

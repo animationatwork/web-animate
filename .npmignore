@@ -1,0 +1,15 @@
+.alm
+.editorconfig
+.gitignore
+.vscode
+assets
+config
+docs
+node_modules
+src
+tests
+rollup.common.js
+tsconfig.json
+tsconfig.es2015.json
+tsconfig.node.json
+tslint.json

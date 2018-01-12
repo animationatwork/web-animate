@@ -1,0 +1,56 @@
+{
+    "author": "Christopher Wallis",
+    "bugs": {
+        "url": "https://github.com/notoriousb1t/edge-animate/issues"
+    },
+    "description": "",
+    "devDependencies": {
+        "@types/chai": "^4.0.10",
+        "@types/jest": "^21.1.10",
+        "@types/node": "^8.5.2",
+        "chai": "^4.1.2",
+        "concurrently": "^3.5.1",
+        "del-cli": "^1.1.0",
+        "jest": "^21.2.1",
+        "ts-jest": "^21.2.4",
+        "tslint": "^5.7.0",
+        "typescript": "^2.6.2"
+    },
+    "homepage": "https://github.com/notoriousb1t/edge-animate#readme",
+    "jest": {
+        "moduleFileExtensions": [
+            "ts",
+            "js"
+        ],
+        "transform": {
+            "^.+\\.(ts)$": "<rootDir>/node_modules/ts-jest/preprocessor.js"
+        },
+        "testRegex": "tests/.*/.*\\.ts$"
+    },
+    "license": "MIT",
+    "main": "index.js",
+    "name": "edge-animate",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/notoriousb1t/edge-animate"
+    },
+    "scripts": {
+        "build": "npm run build:node && npm run build:es2015",
+        "build:node": "tsc -p tsconfig.node.json",
+        "build:es2015": "tsc -p tsconfig.es2015.json",
+        "build:watch": "tsc -p tsconfig.node.json -w",
+        "clean": "node_modules/.bin/del-cli -f dist lib lib.es2015 types",
+        "postversion": "git push --follow-tags && npm publish --access=\"public\"",
+        "preversion": "npm run rebuild",
+        "rebuild": "npm run clean && npm run build",
+        "start": "concurrently \"npm run build:watch\" \"npm run test:watch\" ",
+        "test": "jest",
+        "test:watch": "jest && jest --watchAll"
+    },
+    "types": "./types/index",
+    "typings": "./types/index",
+    "typeRoots": [
+        "node_modules/@types"
+    ],
+    "version": "0.0.0"
+}
