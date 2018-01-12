@@ -131,7 +131,7 @@ function propsToString(keyframe: ICSSKeyframe) {
 /**
  * Animate
  */
-export class Animation implements IAnimation {
+class EdgeAnimation implements IAnimation {
     public get currentTime(): number {
         return this._update()._time
     }
@@ -189,9 +189,9 @@ export class Animation implements IAnimation {
 
         // set initial animation state on element
         const style = element.style
-        style.animation = `${timing.duration}ms ${timing.easing} ${timing.delay}ms ${timing.iterations} ${timing.direction} ${
-            timing.fill
-        } ${animationName}`
+        style.animation = `${timing.duration}ms ${timing.easing} ${timing.delay}ms ${timing.iterations} ${
+            timing.direction
+        } ${timing.fill} ${animationName}`
 
         // calculate total time and set timing
         self._timing = timing
@@ -227,6 +227,7 @@ export class Animation implements IAnimation {
         }
 
         self._last = performance.now()
+        self._time = self._last
         self._update()
     }
     public pause(): void {
@@ -305,6 +306,10 @@ declare global {
 // polyfill older browsers
 if (typeof Element.prototype.animate !== 'undefined') {
     Element.prototype.animate = function(keyframes: IKeyframe[], timings: IEffectTiming): IAnimation {
-        return new Animation(this as HTMLElement, keyframes, timings)
+        return animate(this, keyframes, timings)
     }
+}
+
+export function animate(el: Element, keyframes: IKeyframe[], timings: IEffectTiming): IAnimation {
+    return new EdgeAnimation(el as HTMLElement, keyframes, timings)
 }

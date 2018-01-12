@@ -84,8 +84,8 @@ function propsToString(keyframe) {
     }
     return rules.sort().join(';');
 }
-var Animation = (function () {
-    function Animation(element, keyframes, timing) {
+var EdgeAnimation = (function () {
+    function EdgeAnimation(element, keyframes, timing) {
         timing = timing || {};
         if (!timing.direction) {
             timing.direction = 'normal';
@@ -115,7 +115,7 @@ var Animation = (function () {
         self._reverse = timing.direction.indexOf('reverse') !== -1;
         self.play();
     }
-    Object.defineProperty(Animation.prototype, "currentTime", {
+    Object.defineProperty(EdgeAnimation.prototype, "currentTime", {
         get: function () {
             return this._update()._time;
         },
@@ -126,7 +126,7 @@ var Animation = (function () {
         enumerable: true,
         configurable: true
     });
-    Object.defineProperty(Animation.prototype, "playbackRate", {
+    Object.defineProperty(EdgeAnimation.prototype, "playbackRate", {
         get: function () {
             return this._update()._rate;
         },
@@ -137,24 +137,24 @@ var Animation = (function () {
         enumerable: true,
         configurable: true
     });
-    Object.defineProperty(Animation.prototype, "playState", {
+    Object.defineProperty(EdgeAnimation.prototype, "playState", {
         get: function () {
             return this._update()._state;
         },
         enumerable: true,
         configurable: true
     });
-    Animation.prototype.cancel = function () {
+    EdgeAnimation.prototype.cancel = function () {
         var self = this;
         self._time = self._last = _;
         self._update();
     };
-    Animation.prototype.finish = function () {
+    EdgeAnimation.prototype.finish = function () {
         var self = this;
         self._time = self._rate >= 0 ? self._totalTime : 0;
         self._update();
     };
-    Animation.prototype.play = function () {
+    EdgeAnimation.prototype.play = function () {
         var self = this;
         var isForwards = self._rate >= 0;
         if (isForwards && self._time === self._totalTime) {
@@ -164,19 +164,20 @@ var Animation = (function () {
             self._time = self._totalTime;
         }
         self._last = performance.now();
+        self._time = self._last;
         self._update();
     };
-    Animation.prototype.pause = function () {
+    EdgeAnimation.prototype.pause = function () {
         var self = this;
         self._last = _;
         self._update();
     };
-    Animation.prototype.reverse = function () {
+    EdgeAnimation.prototype.reverse = function () {
         var self = this;
         self._rate *= -1;
         self._update();
     };
-    Animation.prototype._updateElement = function () {
+    EdgeAnimation.prototype._updateElement = function () {
         var self = this;
         var el = self._element;
         var timing = self._timing;
@@ -196,7 +197,7 @@ var Animation = (function () {
         style.animationPlayState = playState;
         style.animationDelay = -localTime + 'ms';
     };
-    Animation.prototype._update = function () {
+    EdgeAnimation.prototype._update = function () {
         var self = this;
         var playState;
         var time = self._time;
@@ -221,15 +222,18 @@ var Animation = (function () {
         self._updateElement();
         return self;
     };
-    return Animation;
+    return EdgeAnimation;
 }());
 if (typeof Element.prototype.animate !== 'undefined') {
     Element.prototype.animate = function (keyframes, timings) {
-        return new Animation(this, keyframes, timings);
+        return animate(this, keyframes, timings);
     };
 }
+function animate(el, keyframes, timings) {
+    return new EdgeAnimation(el, keyframes, timings);
+}
 
-exports.Animation = Animation;
+exports.animate = animate;
 
 return exports;
 
