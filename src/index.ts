@@ -1,5 +1,4 @@
 import { IElementAnimate, IKeyframe, IEffectTiming, IAnimation, ICSSKeyframes, ICSSKeyframe, PlayState } from './types'
-import { clearTimeout } from 'timers'
 
 const _ = undefined as undefined
 const upperCasePattern = /[A-Z]/g
@@ -193,11 +192,13 @@ class EdgeAnimation implements IAnimation {
         const animationName = insertKeyframes(keyframes)
         self.id = animationName
 
-        // set initial animation state on element
+        // set animation options on element
         const style = element.style
-        style.animation = `${timing.duration}ms ${timing.easing} ${timing.delay}ms ${timing.iterations} ${
-            timing.direction
-        } ${timing.fill} ${animationName}`
+        style.animationTimingFunction = timing.easing
+        style.animationDuration = timing.duration + 'ms'
+        style.animationIterationCount = timing.iterations + ''
+        style.animationDirection = timing.direction
+        style.animationFillMode = timing.fill
 
         // calculate total time and set timing
         self._timing = timing
@@ -215,15 +216,17 @@ class EdgeAnimation implements IAnimation {
         const self = this
         self._time = self._last = _
         self._update()
+        self._clearFinish()
         // tslint:disable-next-line:no-unused-expression
         self.oncancel && self.oncancel()
     }
-    public finish(): void {
+    public finish = (): void => {
         const self = this
         self._time = self._rate >= 0 ? self._totalTime : 0
         self._update()
+        self._clearFinish()
         // tslint:disable-next-line:no-unused-expression
-        self._finish()
+        self.onfinish && self.onfinish()
     }
     public play(): void {
         const self = this
@@ -238,7 +241,6 @@ class EdgeAnimation implements IAnimation {
         }
 
         self._last = performance.now()
-        self._time = self._last
         self._update()
     }
     public pause(): void {
@@ -258,56 +260,55 @@ class EdgeAnimation implements IAnimation {
             clearTimeout(self._finishTaskId)
         }
     }
-    private _finish = () => {
-        const self = this
-        self._clearFinish()
-
-        // tslint:disable-next-line:no-unused-expression
-        self.onfinish && self.onfinish()
-    }
     private _updateElement() {
         const self = this
         const el = self._element
-        const timing = self._timing
+        const state = self._state
+
+        // update element
         const style = el.style
-
-        const ps = self._state
-        const playState = ps === 'finished' || ps === 'paused' ? 'paused' : ps === 'running' ? 'running' : ''
-
+        if (state === 'idle') {
+            style.animationName = style.animationPlayState = style.animationDelay = ''
+        } else {
+            style.animationName = self.id
+            style.animationPlayState = state === 'running' ? state : ''
+            style.animationDelay = -self._localTime() + 'ms'
+        }
+    }
+    private _localTime() {
+        const self = this
         // get progression on this iteration
+        const timing = self._timing
         const timeLessDelay = self._time - (timing.delay + timing.endDelay)
         let localTime = timeLessDelay % timing.duration
-        const iteration = Math.floor(timeLessDelay / timing.duration)
-
         if (self._reverse) {
             // reverse if reversed
             localTime = self._timing.duration - localTime
         }
-        if (self._yoyo && !(iteration % 2)) {
+        if (self._yoyo && !(Math.floor(timeLessDelay / timing.duration) % 2)) {
             // reverse if alternated and on an odd iteration
             localTime = self._timing.duration - localTime
         }
-
-        // update element
-        // todo: figure out how to support multiple animations on an element
-        // style.animationName = playState ? self._hash : ''
-        style.animationPlayState = playState
-        style.animationDelay = -localTime + 'ms'
+        return localTime
     }
     private _update() {
         const self = this
 
         let playState: PlayState
         let time = self._time
-        if (self._time === _) {
+        let last = self._last
+        if (time === _) {
             playState = 'idle'
-        } else if (self._last === _) {
+        } else if (last === _) {
             playState = 'paused'
         } else {
-            const delta = performance.now() - self._last
+            const next = performance.now()
+            const delta = next - last
+            last = next
             time += delta
 
-            if (self._time > self._totalTime) {
+            const isForwards = self._rate >= 0
+            if ((isForwards && time >= self._totalTime) || (!isForwards && time <= 0)) {
                 playState = 'finished'
             } else {
                 playState = 'running'
@@ -324,9 +325,9 @@ class EdgeAnimation implements IAnimation {
         self._clearFinish()
 
         // recalculate time remaining and set a timeout for it
-        const isForwards = self._rate <= 0
+        const isForwards = self._rate >= 0
         const _remaining = isForwards ? self._totalTime - self._time : self._time
-        self._finishTaskId = setTimeout(self._finish, _remaining)
+        self._finishTaskId = setTimeout(self.finish, _remaining)
     }
 }
 

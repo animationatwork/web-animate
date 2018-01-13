@@ -86,6 +86,14 @@ function propsToString(keyframe) {
 }
 var EdgeAnimation = (function () {
     function EdgeAnimation(element, keyframes, timing) {
+        var _this = this;
+        this.finish = function () {
+            var self = _this;
+            self._time = self._rate >= 0 ? self._totalTime : 0;
+            self._update();
+            self._clearFinish();
+            self.onfinish && self.onfinish();
+        };
         timing = timing || {};
         if (!timing.direction) {
             timing.direction = 'normal';
@@ -105,10 +113,15 @@ var EdgeAnimation = (function () {
         var self = this;
         self._element = element;
         self._rate = 1;
+        self.pending = false;
         var animationName = insertKeyframes(keyframes);
-        self._hash = animationName;
+        self.id = animationName;
         var style = element.style;
-        style.animation = timing.duration + "ms " + timing.easing + " " + timing.delay + "ms " + timing.iterations + " " + timing.direction + " " + timing.fill + " " + animationName;
+        style.animationTimingFunction = timing.easing;
+        style.animationDuration = timing.duration + 'ms';
+        style.animationIterationCount = timing.iterations + '';
+        style.animationDirection = timing.direction;
+        style.animationFillMode = timing.fill;
         self._timing = timing;
         self._totalTime = (timing.delay || 0) + timing.duration * timing.iterations + (timing.endDelay || 0);
         self._yoyo = timing.direction.indexOf('alternate') !== -1;
@@ -148,23 +161,20 @@ var EdgeAnimation = (function () {
         var self = this;
         self._time = self._last = _;
         self._update();
-    };
-    EdgeAnimation.prototype.finish = function () {
-        var self = this;
-        self._time = self._rate >= 0 ? self._totalTime : 0;
-        self._update();
+        self._clearFinish();
+        self.oncancel && self.oncancel();
     };
     EdgeAnimation.prototype.play = function () {
         var self = this;
         var isForwards = self._rate >= 0;
-        if (isForwards && self._time === self._totalTime) {
+        var isCanceled = self._time === _;
+        if ((isForwards && isCanceled) || self._time === self._totalTime) {
             self._time = 0;
         }
-        else if (!isForwards && self._time === 0) {
+        else if ((!isForwards && isCanceled) || self._time === 0) {
             self._time = self._totalTime;
         }
         self._last = performance.now();
-        self._time = self._last;
         self._update();
     };
     EdgeAnimation.prototype.pause = function () {
@@ -177,40 +187,57 @@ var EdgeAnimation = (function () {
         self._rate *= -1;
         self._update();
     };
+    EdgeAnimation.prototype._clearFinish = function () {
+        var self = this;
+        if (self._finishTaskId) {
+            clearTimeout(self._finishTaskId);
+        }
+    };
     EdgeAnimation.prototype._updateElement = function () {
         var self = this;
         var el = self._element;
-        var timing = self._timing;
+        var state = self._state;
         var style = el.style;
-        var ps = self._state;
-        var playState = ps === 'finished' || ps === 'paused' ? 'paused' : ps === 'running' ? 'running' : '';
+        if (state === 'idle') {
+            style.animationName = style.animationPlayState = style.animationDelay = '';
+        }
+        else {
+            style.animationName = self.id;
+            style.animationPlayState = state === 'running' ? state : '';
+            style.animationDelay = -self._localTime() + 'ms';
+        }
+    };
+    EdgeAnimation.prototype._localTime = function () {
+        var self = this;
+        var timing = self._timing;
         var timeLessDelay = self._time - (timing.delay + timing.endDelay);
         var localTime = timeLessDelay % timing.duration;
-        var iteration = Math.floor(timeLessDelay / timing.duration);
         if (self._reverse) {
             localTime = self._timing.duration - localTime;
         }
-        if (self._yoyo && !(iteration % 2)) {
+        if (self._yoyo && !(Math.floor(timeLessDelay / timing.duration) % 2)) {
             localTime = self._timing.duration - localTime;
         }
-        console.log(self._hash);
-        style.animationPlayState = playState;
-        style.animationDelay = -localTime + 'ms';
+        return localTime;
     };
     EdgeAnimation.prototype._update = function () {
         var self = this;
         var playState;
         var time = self._time;
-        if (self._time === _) {
+        var last = self._last;
+        if (time === _) {
             playState = 'idle';
         }
-        else if (self._last === _) {
+        else if (last === _) {
             playState = 'paused';
         }
         else {
-            var delta = performance.now() - self._last;
+            var next = performance.now();
+            var delta = next - last;
+            last = next;
             time += delta;
-            if (self._time > self._totalTime) {
+            var isForwards = self._rate >= 0;
+            if ((isForwards && time >= self._totalTime) || (!isForwards && time <= 0)) {
                 playState = 'finished';
             }
             else {
@@ -220,7 +247,15 @@ var EdgeAnimation = (function () {
         self._state = playState;
         self._time = time;
         self._updateElement();
+        self._updateSchedule();
         return self;
+    };
+    EdgeAnimation.prototype._updateSchedule = function () {
+        var self = this;
+        self._clearFinish();
+        var isForwards = self._rate >= 0;
+        var _remaining = isForwards ? self._totalTime - self._time : self._time;
+        self._finishTaskId = setTimeout(self.finish, _remaining);
     };
     return EdgeAnimation;
 }());
