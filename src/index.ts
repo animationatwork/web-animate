@@ -1,4 +1,5 @@
 import { IElementAnimate, IKeyframe, IEffectTiming, IAnimation, ICSSKeyframes, ICSSKeyframe, PlayState } from './types'
+import { clearTimeout } from 'timers'
 
 const _ = undefined as undefined
 const upperCasePattern = /[A-Z]/g
@@ -149,16 +150,20 @@ class EdgeAnimation implements IAnimation {
     public get playState(): PlayState {
         return this._update()._state
     }
+    public oncancel: Function
+    public onfinish: Function
+    public id: string
+    public pending: boolean
     private _time: number
     private _totalTime: number
     private _last: number
     private _element: HTMLElement
     private _timing: IEffectTiming
-    private _hash: string
     private _rate: number
     private _state: PlayState
     private _yoyo: boolean
     private _reverse: boolean
+    private _finishTaskId: any
 
     constructor(element: HTMLElement, keyframes: IKeyframe[], timing: IEffectTiming) {
         // set default timings
@@ -182,10 +187,11 @@ class EdgeAnimation implements IAnimation {
         const self = this
         self._element = element
         self._rate = 1
+        self.pending = false
 
         // insert animation definition
         const animationName = insertKeyframes(keyframes)
-        self._hash = animationName
+        self.id = animationName
 
         // set initial animation state on element
         const style = element.style
@@ -209,20 +215,25 @@ class EdgeAnimation implements IAnimation {
         const self = this
         self._time = self._last = _
         self._update()
+        // tslint:disable-next-line:no-unused-expression
+        self.oncancel && self.oncancel()
     }
     public finish(): void {
         const self = this
         self._time = self._rate >= 0 ? self._totalTime : 0
         self._update()
+        // tslint:disable-next-line:no-unused-expression
+        self._finish()
     }
     public play(): void {
         const self = this
 
         // update time if applicable
         const isForwards = self._rate >= 0
-        if (isForwards && self._time === self._totalTime) {
+        const isCanceled = self._time === _
+        if ((isForwards && isCanceled) || self._time === self._totalTime) {
             self._time = 0
-        } else if (!isForwards && self._time === 0) {
+        } else if ((!isForwards && isCanceled) || self._time === 0) {
             self._time = self._totalTime
         }
 
@@ -239,6 +250,20 @@ class EdgeAnimation implements IAnimation {
         const self = this
         self._rate *= -1
         self._update()
+    }
+    private _clearFinish() {
+        const self = this
+        if (self._finishTaskId) {
+            // clear last timeout
+            clearTimeout(self._finishTaskId)
+        }
+    }
+    private _finish = () => {
+        const self = this
+        self._clearFinish()
+
+        // tslint:disable-next-line:no-unused-expression
+        self.onfinish && self.onfinish()
     }
     private _updateElement() {
         const self = this
@@ -266,7 +291,6 @@ class EdgeAnimation implements IAnimation {
         // update element
         // todo: figure out how to support multiple animations on an element
         // style.animationName = playState ? self._hash : ''
-        console.log(self._hash)
         style.animationPlayState = playState
         style.animationDelay = -localTime + 'ms'
     }
@@ -292,7 +316,17 @@ class EdgeAnimation implements IAnimation {
         self._state = playState
         self._time = time
         self._updateElement()
+        self._updateSchedule()
         return self
+    }
+    private _updateSchedule() {
+        const self = this
+        self._clearFinish()
+
+        // recalculate time remaining and set a timeout for it
+        const isForwards = self._rate <= 0
+        const _remaining = isForwards ? self._totalTime - self._time : self._time
+        self._finishTaskId = setTimeout(self._finish, _remaining)
     }
 }
 
