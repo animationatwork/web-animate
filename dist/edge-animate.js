@@ -5,42 +5,7 @@ var _ = undefined;
 var upperCasePattern = /[A-Z]/g;
 var propLower = function (m) { return "-" + m.toLowerCase(); };
 var msPattern = /^ms-/;
-var allKeyframes = {};
-var taskId;
-var styleElement;
-function renderStyles() {
-    taskId = taskId || setTimeout(renderStylesheet, 0);
-}
-function renderStylesheet() {
-    taskId = 0;
-    if (!styleElement) {
-        styleElement = document.createElement('style');
-        styleElement.setAttribute('rel', 'stylesheet');
-        document.head.appendChild(styleElement);
-    }
-    var contents = '';
-    for (var key in allKeyframes) {
-        contents += '@keyframes ' + key + '{' + allKeyframes[key] + '}';
-    }
-    styleElement.innerHTML = contents;
-}
-function insertKeyframes(keyframes) {
-    var rules = framesToString(waapiToKeyframes(keyframes));
-    var hash = 'ea_' + stringHash(rules);
-    if (!allKeyframes[hash]) {
-        allKeyframes[hash] = rules;
-        renderStyles();
-    }
-    return hash;
-}
-function stringHash(str) {
-    var value = 5381;
-    var len = str.length;
-    while (len--) {
-        value = (value * 33) ^ str.charCodeAt(len);
-    }
-    return (value >>> 0).toString(36);
-}
+
 function hyphenate(propertyName) {
     return (propertyName
         .replace(upperCasePattern, propLower)
@@ -84,13 +49,55 @@ function propsToString(keyframe) {
     }
     return rules.sort().join(';');
 }
+function waapiToString(keyframes) {
+    return framesToString(waapiToKeyframes(keyframes));
+}
+
+var allKeyframes = {};
+var taskId;
+var styleElement;
+function renderStyles() {
+    taskId = taskId || setTimeout(renderStylesheet, 0);
+}
+function renderStylesheet() {
+    taskId = 0;
+    if (!styleElement) {
+        styleElement = document.createElement('style');
+        styleElement.setAttribute('rel', 'stylesheet');
+        document.head.appendChild(styleElement);
+    }
+    var contents = '';
+    for (var key in allKeyframes) {
+        contents += '@keyframes ' + key + '{' + allKeyframes[key] + '}';
+    }
+    styleElement.innerHTML = contents;
+}
+function stringHash(str) {
+    var value = 5381;
+    var len = str.length;
+    while (len--) {
+        value = (value * 33) ^ str.charCodeAt(len);
+    }
+    return (value >>> 0).toString(36);
+}
+function insertKeyframes(rules) {
+    var hash = 'ea_' + stringHash(rules);
+    if (!allKeyframes[hash]) {
+        allKeyframes[hash] = rules;
+        renderStyles();
+    }
+    return hash;
+}
+
 var EdgeAnimation = (function () {
     function EdgeAnimation(element, keyframes, timing) {
         var _this = this;
         this.finish = function () {
             var self = _this;
             self._time = self._rate >= 0 ? self._totalTime : 0;
-            self._update();
+            if (self._state !== 'finished') {
+                self._update();
+            }
             self._clearFinish();
             self.onfinish && self.onfinish();
         };
@@ -110,16 +117,26 @@ var EdgeAnimation = (function () {
         if (!timing.fill) {
             timing.fill = 'none';
         }
+        if (!timing.delay) {
+            timing.delay = 0;
+        }
+        if (!timing.endDelay) {
+            timing.endDelay = 0;
+        }
         var self = this;
         self._element = element;
         self._rate = 1;
         self.pending = false;
-        var animationName = insertKeyframes(keyframes);
-        self.id = animationName;
+        var fill = timing.fill;
+        var fillBoth = fill === 'both';
+        self._isFillForwards = fillBoth || fill === 'forwards';
+        self._isFillBackwards = fillBoth || fill === 'backwards';
+        var rules = waapiToString(keyframes);
+        self.id = insertKeyframes(rules);
         var style = element.style;
         style.animationTimingFunction = timing.easing;
         style.animationDuration = timing.duration + 'ms';
-        style.animationIterationCount = timing.iterations + '';
+        style.animationIterationCount = timing.iterations === Infinity ? 'infinite' : timing.iterations + '';
         style.animationDirection = timing.direction;
         style.animationFillMode = timing.fill;
         self._timing = timing;
@@ -168,10 +185,10 @@ var EdgeAnimation = (function () {
         var self = this;
         var isForwards = self._rate >= 0;
         var isCanceled = self._time === _;
-        if ((isForwards && isCanceled) || self._time === self._totalTime) {
+        if (isForwards && (isCanceled || self._time >= self._totalTime)) {
             self._time = 0;
         }
-        else if ((!isForwards && isCanceled) || self._time === 0) {
+        else if (!isForwards && (isCanceled || self._time <= 0)) {
             self._time = self._totalTime;
         }
         self._last = performance.now();
@@ -202,9 +219,12 @@ var EdgeAnimation = (function () {
             style.animationName = style.animationPlayState = style.animationDelay = '';
         }
         else {
-            style.animationName = self.id;
-            style.animationPlayState = state === 'running' ? state : '';
+            style.animationName = '';
+            void el.offsetWidth;
             style.animationDelay = -self._localTime() + 'ms';
+            style.animationPlayState = state === 'finished' || state === 'paused' ? 'paused' : state;
+            style.animationName = self.id;
+            console.log(-self._localTime() + 'ms', state, self.id);
         }
     };
     EdgeAnimation.prototype._localTime = function () {
@@ -218,7 +238,7 @@ var EdgeAnimation = (function () {
         if (self._yoyo && !(Math.floor(timeLessDelay / timing.duration) % 2)) {
             localTime = self._timing.duration - localTime;
         }
-        return localTime;
+        return self._totalTime < localTime ? self._totalTime : localTime < 0 ? 0 : localTime;
     };
     EdgeAnimation.prototype._update = function () {
         var self = this;
@@ -239,6 +259,12 @@ var EdgeAnimation = (function () {
             var isForwards = self._rate >= 0;
             if ((isForwards && time >= self._totalTime) || (!isForwards && time <= 0)) {
                 playState = 'finished';
+                if (isForwards && self._isFillForwards) {
+                    time = self._totalTime;
+                }
+                if (!isForwards && self._isFillBackwards) {
+                    time = 0;
+                }
             }
             else {
                 playState = 'running';
@@ -259,6 +285,7 @@ var EdgeAnimation = (function () {
     };
     return EdgeAnimation;
 }());
+
 if (typeof Element.prototype.animate !== 'undefined') {
     Element.prototype.animate = function (keyframes, timings) {
         return animate(this, keyframes, timings);
