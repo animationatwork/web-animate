@@ -1,10 +1,14 @@
 var edge = (function (exports) {
 'use strict';
 
-var _ = undefined;
 var upperCasePattern = /[A-Z]/g;
 var propLower = function (m) { return "-" + m.toLowerCase(); };
 var msPattern = /^ms-/;
+var _ = undefined;
+var idle = 'idle';
+var finished = 'finished';
+var milliseconds = 'ms';
+var paused = 'paused';
 
 function hyphenate(propertyName) {
     return (propertyName
@@ -124,7 +128,7 @@ function Animation(element, keyframes, timing) {
     self.id = insertKeyframes(rules);
     var style = element.style;
     style.animationTimingFunction = timing.easing;
-    style.animationDuration = timing.duration + 'ms';
+    style.animationDuration = timing.duration + milliseconds;
     style.animationIterationCount = timing.iterations === Infinity ? 'infinite' : timing.iterations + '';
     style.animationDirection = timing.direction;
     style.animationFillMode = timing.fill;
@@ -138,36 +142,36 @@ function Animation(element, keyframes, timing) {
 }
 Animation.prototype = {
     get currentTime() {
-        return _update(this)._time;
+        return updateTiming(this)._time;
     },
     set currentTime(val) {
         this._time = val;
-        _update(this);
+        updateTiming(this);
     },
     get playbackRate() {
-        return _update(this)._rate;
+        return updateTiming(this)._rate;
     },
     set playbackRate(val) {
         this._rate = val;
-        _update(this);
+        updateTiming(this);
     },
     get playState() {
-        return _update(this)._state;
+        return updateTiming(this)._state;
     },
     cancel: function () {
         var self = this;
         self._time = self._last = _;
-        _update(self);
-        _clearFinish(self);
+        updateTiming(self);
+        clearFinishTimeout(self);
         self.oncancel && self.oncancel();
     },
     finish: function () {
         var self = this;
         self._time = self._rate >= 0 ? self._totalTime : 0;
-        if (self._state !== 'finished') {
-            _update(self);
+        if (self._state !== finished) {
+            updateTiming(self);
         }
-        _clearFinish(self);
+        clearFinishTimeout(self);
         self.onfinish && self.onfinish();
     },
     play: function () {
@@ -181,39 +185,39 @@ Animation.prototype = {
             self._time = self._totalTime;
         }
         self._last = performance.now();
-        _update(self);
+        updateTiming(self);
     },
     pause: function () {
         this._last = _;
-        _update(this);
+        updateTiming(this);
     },
     reverse: function () {
         this._rate *= -1;
-        _update(this);
+        updateTiming(this);
     }
 };
-function _clearFinish(self) {
+function clearFinishTimeout(self) {
     if (self._finishTaskId) {
         clearTimeout(self._finishTaskId);
     }
 }
-function _updateElement(self) {
+function updateElement(self) {
     var el = self._element;
     var state = self._state;
     var style = el.style;
-    if (state === 'idle') {
+    if (state === idle) {
         style.animationName = style.animationPlayState = style.animationDelay = '';
     }
     else {
         style.animationName = '';
         void el.offsetWidth;
-        style.animationDelay = -_localTime(self) + 'ms';
-        style.animationPlayState = state === 'finished' || state === 'paused' ? 'paused' : state;
+        style.animationDelay = -toLocalTime(self) + milliseconds;
+        style.animationPlayState = state === finished || state === paused ? paused : state;
         style.animationName = self.id;
-        console.log(-_localTime(self) + 'ms', state, self.id);
+        console.log(-toLocalTime(self) + milliseconds, state, self.id);
     }
 }
-function _localTime(self) {
+function toLocalTime(self) {
     var timing = self._timing;
     var timeLessDelay = self._time - (timing.delay + timing.endDelay);
     var localTime = timeLessDelay % timing.duration;
@@ -225,15 +229,15 @@ function _localTime(self) {
     }
     return self._totalTime < localTime ? self._totalTime : localTime < 0 ? 0 : localTime;
 }
-function _update(self) {
+function updateTiming(self) {
     var playState;
     var time = self._time;
     var last = self._last;
     if (time === _) {
-        playState = 'idle';
+        playState = idle;
     }
     else if (last === _) {
-        playState = 'paused';
+        playState = paused;
     }
     else {
         var next = performance.now();
@@ -242,7 +246,7 @@ function _update(self) {
         time += delta;
         var isForwards = self._rate >= 0;
         if ((isForwards && time >= self._totalTime) || (!isForwards && time <= 0)) {
-            playState = 'finished';
+            playState = finished;
             if (isForwards && self._isFillForwards) {
                 time = self._totalTime;
             }
@@ -256,12 +260,12 @@ function _update(self) {
     }
     self._state = playState;
     self._time = time;
-    _updateElement(self);
-    _updateSchedule(self);
+    updateElement(self);
+    updateScheduler(self);
     return self;
 }
-function _updateSchedule(self) {
-    _clearFinish(self);
+function updateScheduler(self) {
+    clearFinishTimeout(self);
     var isForwards = self._rate >= 0;
     var _remaining = isForwards ? self._totalTime - self._time : self._time;
     self._finishTaskId = setTimeout(self.finish, _remaining);
