@@ -15,34 +15,6 @@ function hyphenate(propertyName) {
         .replace(upperCasePattern, propLower)
         .replace(msPattern, '-ms-'));
 }
-function waapiToKeyframes(keyframes) {
-    var results = {};
-    for (var i = 0, ilen = keyframes.length; i < ilen; i++) {
-        var keyframe = keyframes[i];
-        var offset = keyframe.offset;
-        var target = results[offset] || (results[offset] = {});
-        for (var key in keyframe) {
-            var newKey = key;
-            if (key === 'easing') {
-                newKey = 'animation-timing-function';
-            }
-            if (key !== 'offset') {
-                target[newKey] = keyframe[key];
-            }
-        }
-    }
-    return results;
-}
-function framesToString(keyframes) {
-    var keys = Object.keys(keyframes).sort();
-    var ilen = keys.length;
-    var rules = Array(ilen);
-    for (var i = 0; i < ilen; i++) {
-        var key = keys[i];
-        rules[i] = +key * 100 + '%{' + propsToString(keyframes[key]) + '}';
-    }
-    return rules.join('\n');
-}
 function propsToString(keyframe) {
     var rules = [];
     for (var key in keyframe) {
@@ -54,7 +26,29 @@ function propsToString(keyframe) {
     return rules.sort().join(';');
 }
 function waapiToString(keyframes) {
-    return framesToString(waapiToKeyframes(keyframes));
+    var frames = {};
+    for (var i = 0, ilen = keyframes.length; i < ilen; i++) {
+        var keyframe = keyframes[i];
+        var offset = keyframe.offset;
+        var target = frames[offset] || (frames[offset] = {});
+        for (var key in keyframe) {
+            var newKey = key;
+            if (key === 'easing') {
+                newKey = 'animation-timing-function';
+            }
+            if (key !== 'offset') {
+                target[newKey] = keyframe[key];
+            }
+        }
+    }
+    var keys = Object.keys(frames).sort();
+    var jlen = keys.length;
+    var rules = Array(jlen);
+    for (var j = 0; j < jlen; j++) {
+        var key = keys[j];
+        rules[j] = +key * 100 + '%{' + propsToString(frames[key]) + '}';
+    }
+    return rules.join('\n');
 }
 
 var allKeyframes = {};
