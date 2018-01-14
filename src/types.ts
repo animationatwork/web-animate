@@ -4,9 +4,14 @@ export interface IElementAnimate {
 }
 
 export interface IAnimation {
+    id: string
     currentTime: number
     playState: PlayState
     playbackRate: number
+    pending: boolean
+
+    oncancel?: Function
+    onfinish?: Function
 
     cancel(): void
     finish(): void

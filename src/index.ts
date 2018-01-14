@@ -1,5 +1,5 @@
 import { IElementAnimate, IEffectTiming, IAnimation, IKeyframe } from './types';
-import { EdgeAnimation } from './EdgeAnimation';
+import { Animation } from './Animation';
 
 declare global {
     // tslint:disable-next-line:interface-name
@@ -16,5 +16,5 @@ if (typeof Element.prototype.animate !== 'undefined') {
 }
 
 export function animate(el: Element, keyframes: IKeyframe[], timings: IEffectTiming): IAnimation {
-    return new EdgeAnimation(el as HTMLElement, keyframes, timings)
+    return Animation(el as HTMLElement, keyframes, timings)
 }

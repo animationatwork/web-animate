@@ -47,7 +47,30 @@ const config = ({
 
     if (minify) {
         // optional minify
-        options.plugins.push(uglify({}, uglifyEs.minify))
+        const minifyOptions = {
+            "warnings": "verbose",
+            "compress": {
+                "collapse_vars": true,
+                "comparisons": true,
+                "conditionals": true,
+                "dead_code": true,
+                "drop_console": true,
+                "evaluate": false,
+                "if_return": true,
+                "inline": true,
+                "reduce_vars": true,
+                "loops": true,
+                "passes": 3,
+                "unsafe_comps": true,
+                "typeofs": false
+            },
+            "output": {
+                "semicolons": false
+            },
+            "toplevel": false,
+            "ie8": false
+        }
+        options.plugins.push(uglify(minifyOptions, uglifyEs.minify))
     }
 
     return options
