@@ -87,6 +87,7 @@ function insertKeyframes(rules) {
     return hash;
 }
 
+var epsilon = 0.0001;
 function Animation(element, keyframes, timing) {
     timing = timing || {};
     if (!timing.direction) {
@@ -172,10 +173,11 @@ Animation.prototype = {
         var self = this;
         var isForwards = self._rate >= 0;
         var isCanceled = self._time === _;
-        if (isForwards && (isCanceled || self._time >= self._totalTime)) {
+        var time = isCanceled ? _ : Math.round(self._time);
+        if (isForwards && (isCanceled || time >= self._totalTime)) {
             self._time = 0;
         }
-        else if (!isForwards && (isCanceled || self._time <= 0)) {
+        else if (!isForwards && (isCanceled || time <= 0)) {
             self._time = self._totalTime;
         }
         self._last = performance.now();
@@ -237,15 +239,15 @@ function updateTiming(self) {
         var next = performance.now();
         var delta = next - last;
         last = next;
-        time += delta;
+        time = Math.round(time + delta);
         var isForwards = self._rate >= 0;
         if ((isForwards && time >= self._totalTime) || (!isForwards && time <= 0)) {
             playState = finished;
             if (isForwards && self._isFillForwards) {
-                time = self._totalTime;
+                time = self._totalTime - epsilon;
             }
             if (!isForwards && self._isFillBackwards) {
-                time = 0;
+                time = 0 - epsilon;
             }
         }
         else {

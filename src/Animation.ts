@@ -3,6 +3,8 @@ import { waapiToString } from './waapiToString'
 import { insertKeyframes } from './styles'
 import { _, finished, idle, paused, milliseconds } from './constants'
 
+const epsilon = 0.0001
+
 /**
  * IAnimation + private fields
  */
@@ -133,9 +135,10 @@ Animation.prototype = {
         // update time if applicable
         const isForwards = self._rate >= 0
         const isCanceled = self._time === _
-        if (isForwards && (isCanceled || self._time >= self._totalTime)) {
+        const time = isCanceled ? _ : Math.round(self._time)
+        if (isForwards && (isCanceled || time >= self._totalTime)) {
             self._time = 0
-        } else if (!isForwards && (isCanceled || self._time <= 0)) {
+        } else if (!isForwards && (isCanceled || time <= 0)) {
             self._time = self._totalTime
         }
 
@@ -206,16 +209,17 @@ function updateTiming(self: IEdgeAnimation) {
         const next = performance.now()
         const delta = next - last
         last = next
-        time += delta
+        time = Math.round(time + delta)
 
         const isForwards = self._rate >= 0
         if ((isForwards && time >= self._totalTime) || (!isForwards && time <= 0)) {
             playState = finished
             if (isForwards && self._isFillForwards) {
-                time = self._totalTime
+                //
+                time = self._totalTime - epsilon
             }
             if (!isForwards && self._isFillBackwards) {
-                time = 0
+                time = 0 - epsilon
             }
         } else {
             playState = 'running'
