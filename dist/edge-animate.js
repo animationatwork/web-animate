@@ -9,6 +9,7 @@ var idle = 'idle';
 var finished = 'finished';
 var milliseconds = 'ms';
 var paused = 'paused';
+var running = 'running';
 
 function hyphenate(propertyName) {
     return (propertyName
@@ -88,30 +89,17 @@ function insertKeyframes(rules) {
 }
 
 var epsilon = 0.0001;
+function now() {
+    return performance.now();
+}
 function Animation(element, keyframes, timing) {
-    timing = timing || {};
-    if (!timing.direction) {
-        timing.direction = 'normal';
-    }
-    if (!timing.easing) {
-        timing.easing = 'linear';
-    }
-    if (!timing.iterations) {
-        timing.iterations = 1;
-    }
-    if (!timing.delay) {
-        timing.delay = 0;
-    }
-    if (!timing.fill) {
-        timing.fill = 'none';
-    }
-    if (!timing.delay) {
-        timing.delay = 0;
-    }
-    if (!timing.endDelay) {
-        timing.endDelay = 0;
-    }
-    var self = Object.create(Animation.prototype);
+    timing.direction = timing.direction || 'normal';
+    timing.easing = timing.easing || 'linear';
+    timing.iterations = timing.iterations || 1;
+    timing.fill = timing.fill || 'none';
+    timing.delay = timing.delay || 0;
+    timing.endDelay = timing.endDelay || 0;
+    var self = this;
     self._element = element;
     self._rate = 1;
     self.pending = false;
@@ -133,7 +121,6 @@ function Animation(element, keyframes, timing) {
     self._reverse = timing.direction.indexOf('reverse') !== -1;
     self.finish = self.finish.bind(self);
     self.play();
-    return self;
 }
 Animation.prototype = {
     get currentTime() {
@@ -155,8 +142,9 @@ Animation.prototype = {
     },
     cancel: function () {
         var self = this;
-        self._time = self._last = _;
-        updateTiming(self);
+        self._time = self._startTime = _;
+        self._state = idle;
+        updateElement(self);
         clearFinishTimeout(self);
         self.oncancel && self.oncancel();
     },
@@ -180,11 +168,13 @@ Animation.prototype = {
         else if (!isForwards && (isCanceled || time <= 0)) {
             self._time = self._totalTime;
         }
-        self._last = performance.now();
+        self._startTime = now();
+        this._state = running;
         updateTiming(self);
     },
     pause: function () {
-        this._last = _;
+        var self = this;
+        self._state = paused;
         updateTiming(this);
     },
     reverse: function () {
@@ -193,9 +183,7 @@ Animation.prototype = {
     }
 };
 function clearFinishTimeout(self) {
-    if (self._finishTaskId) {
-        clearTimeout(self._finishTaskId);
-    }
+    self._finishTaskId && clearTimeout(self._finishTaskId);
 }
 function updateElement(self) {
     var el = self._element;
@@ -226,42 +214,37 @@ function toLocalTime(self) {
     return self._totalTime < localTime ? self._totalTime : localTime < 0 ? 0 : localTime;
 }
 function updateTiming(self) {
-    var playState;
-    var time = self._time;
-    var last = self._last;
-    if (time === _) {
-        playState = idle;
-    }
-    else if (last === _) {
-        playState = paused;
-    }
-    else {
-        var next = performance.now();
-        var delta = next - last;
-        last = next;
-        time = Math.round(time + delta);
+    var startTime = self._startTime;
+    var state = self._state;
+    var next = now();
+    var time = Math.round(self._time + (next - startTime));
+    self._time = time;
+    var isPaused = state === paused || state === finished;
+    if (!isPaused) {
+        self._startTime = next;
         var isForwards = self._rate >= 0;
         if ((isForwards && time >= self._totalTime) || (!isForwards && time <= 0)) {
-            playState = finished;
+            self._state = finished;
             if (isForwards && self._isFillForwards) {
-                time = self._totalTime - epsilon;
+                self._time = self._totalTime - epsilon;
             }
             if (!isForwards && self._isFillBackwards) {
-                time = 0 - epsilon;
+                self._time = 0 + epsilon;
             }
-        }
-        else {
-            playState = 'running';
+            self._startTime = _;
         }
     }
-    self._state = playState;
-    self._time = time;
     updateElement(self);
-    updateScheduler(self);
+    clearFinishTimeout(self);
+    if (!isPaused) {
+        updateScheduler(self);
+    }
     return self;
 }
 function updateScheduler(self) {
-    clearFinishTimeout(self);
+    if (self._state !== running) {
+        return;
+    }
     var isForwards = self._rate >= 0;
     var _remaining = isForwards ? self._totalTime - self._time : self._time;
     self._finishTaskId = setTimeout(self.finish, _remaining);
@@ -273,7 +256,7 @@ if (typeof Element.prototype.animate !== 'undefined') {
     };
 }
 function animate(el, keyframes, timings) {
-    return Animation(el, keyframes, timings);
+    return new Animation(el, keyframes, timings);
 }
 
 exports.animate = animate;

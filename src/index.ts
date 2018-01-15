@@ -16,5 +16,5 @@ if (typeof Element.prototype.animate !== 'undefined') {
 }
 
 export function animate(el: Element, keyframes: IKeyframe[], timings: IEffectTiming): IAnimation {
-    return Animation(el as HTMLElement, keyframes, timings)
+    return new (Animation as any)(el as HTMLElement, keyframes, timings)
 }

@@ -1,9 +1,13 @@
 import { IKeyframe, IEffectTiming, IAnimation, PlayState } from './types'
 import { waapiToString } from './waapiToString'
 import { insertKeyframes } from './styles'
-import { _, finished, idle, paused, milliseconds } from './constants'
+import { _, finished, idle, paused, milliseconds, running } from './constants'
 
 const epsilon = 0.0001
+
+function now() {
+    return performance.now()
+}
 
 /**
  * IAnimation + private fields
@@ -11,7 +15,7 @@ const epsilon = 0.0001
 interface IEdgeAnimation extends IAnimation {
     _time: number
     _totalTime: number
-    _last: number
+    _startTime: number
     _element: HTMLElement
     _timing: IEffectTiming
     _rate: number
@@ -23,37 +27,17 @@ interface IEdgeAnimation extends IAnimation {
     _isFillBackwards: boolean
 }
 
-export function Animation(
-    element: HTMLElement,
-    keyframes: IKeyframe[],
-    timing: IEffectTiming
-): IAnimation {
+export function Animation(element: HTMLElement, keyframes: IKeyframe[], timing: IEffectTiming) {
     // set default options
-    timing = timing || {}
-    if (!timing.direction) {
-        timing.direction = 'normal'
-    }
-    if (!timing.easing) {
-        timing.easing = 'linear'
-    }
-    if (!timing.iterations) {
-        timing.iterations = 1
-    }
-    if (!timing.delay) {
-        timing.delay = 0
-    }
-    if (!timing.fill) {
-        timing.fill = 'none'
-    }
-    if (!timing.delay) {
-        timing.delay = 0
-    }
-    if (!timing.endDelay) {
-        timing.endDelay = 0
-    }
+    timing.direction = timing.direction || 'normal'
+    timing.easing = timing.easing || 'linear'
+    timing.iterations = timing.iterations || 1
+    timing.fill = timing.fill || 'none'
+    timing.delay = timing.delay || 0
+    timing.endDelay = timing.endDelay || 0
 
     // cast self as internal version of Animation
-    const self = Object.create(Animation.prototype) as IEdgeAnimation
+    const self = this as IEdgeAnimation
     self._element = element
     self._rate = 1
     self.pending = false
@@ -89,8 +73,6 @@ export function Animation(
 
     // start playing
     self.play()
-
-    return self
 }
 
 Animation.prototype = {
@@ -113,8 +95,9 @@ Animation.prototype = {
     },
     cancel(this: IEdgeAnimation): void {
         const self = this
-        self._time = self._last = _
-        updateTiming(self)
+        self._time = self._startTime = _
+        self._state = idle
+        updateElement(self)
         clearFinishTimeout(self)
         // tslint:disable-next-line:no-unused-expression
         self.oncancel && self.oncancel()
@@ -142,11 +125,13 @@ Animation.prototype = {
             self._time = self._totalTime
         }
 
-        self._last = performance.now()
+        self._startTime = now()
+        this._state = running
         updateTiming(self)
     },
     pause(this: IEdgeAnimation): void {
-        this._last = _
+        const self = this
+        self._state = paused
         updateTiming(this)
     },
     reverse(this: IEdgeAnimation): void {
@@ -156,10 +141,9 @@ Animation.prototype = {
 }
 
 function clearFinishTimeout(self: IEdgeAnimation) {
-    if (self._finishTaskId) {
-        // clear last timeout
-        clearTimeout(self._finishTaskId)
-    }
+    // clear last timeout
+    // tslint:disable-next-line:no-unused-expression
+    self._finishTaskId && clearTimeout(self._finishTaskId)
 }
 function updateElement(self: IEdgeAnimation) {
     const el = self._element
@@ -196,45 +180,49 @@ function toLocalTime(self: IEdgeAnimation) {
     }
     return self._totalTime < localTime ? self._totalTime : localTime < 0 ? 0 : localTime
 }
-function updateTiming(self: IEdgeAnimation) {
 
-    let playState: PlayState
-    let time = self._time
-    let last = self._last
-    if (time === _) {
-        playState = idle
-    } else if (last === _) {
-        playState = paused
-    } else {
-        const next = performance.now()
-        const delta = next - last
-        last = next
-        time = Math.round(time + delta)
+function updateTiming(self: IEdgeAnimation) {
+    const startTime = self._startTime
+    const state = self._state
+    let next = now()
+    let time = Math.round(self._time + (next - startTime))
+    self._time = time
+
+    const isPaused = state === paused || state === finished
+    if (!isPaused) {
+        self._startTime = next
 
         const isForwards = self._rate >= 0
         if ((isForwards && time >= self._totalTime) || (!isForwards && time <= 0)) {
-            playState = finished
+            // check if state has transitioned to finish
+            self._state = finished
             if (isForwards && self._isFillForwards) {
-                //
-                time = self._totalTime - epsilon
+                // move playhead to the end (minus a little bit to prevent setting to 0)
+                self._time = self._totalTime - epsilon
             }
             if (!isForwards && self._isFillBackwards) {
-                time = 0 - epsilon
+                // move playhead to the end (plus a little bit to prevent setting to total time)
+                self._time = 0 + epsilon
             }
-        } else {
-            playState = 'running'
+
+            // remove startTime since the "timer" isn't running
+            self._startTime = _
         }
     }
 
-    self._state = playState
-    self._time = time
     updateElement(self)
-    updateScheduler(self)
+    clearFinishTimeout(self)
+
+    if (!isPaused) {
+        updateScheduler(self)
+    }
     return self
 }
 function updateScheduler(self: IEdgeAnimation) {
-    clearFinishTimeout(self)
-
+    if (self._state !== running) {
+        // if the animation isn't running, there is no point in scheduling the finish
+        return
+    }
     // recalculate time remaining and set a timeout for it
     const isForwards = self._rate >= 0
     const _remaining = isForwards ? self._totalTime - self._time : self._time
