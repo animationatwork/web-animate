@@ -1,4 +1,4 @@
-# Edge Animate
+# Web Animate
 
 >A lightweight polyfill for the Web Animations API. (WAAPI)
 
@@ -10,17 +10,17 @@ This library automatically polyfills on browsers without Element.prototype.anima
 
 ```js
 // force rendering of CSS keyframes immediately
-edge.forceRender()
+webAnimate.forceRender()
 
 // call animate directly
-edge.animate(el, keyframes, timing)
+webAnimate.animate(el, keyframes, timing)
 
 // manually replaces animate()
 // Call only if you want to forcibly overwrite Element.prototype.animate()
-edge.polyfill()
+webAnimate.polyfill()
 
 // use this to determine if the animate() has been overridden
-if (edge.isPolyfilled()) {
+if (webAnimate.isPolyfilled()) {
     // do something
 }
 ```
@@ -30,26 +30,26 @@ if (edge.isPolyfilled()) {
 Include this in your head:
 
 ```html
-<script href="https://unpkg.com/edge-animate/dist/edge-animate.min.js"></script>
+<script href="https://unpkg.com/web-animate/dist/web-animate.min.js"></script>
 ```
 
 Or download with npm and import this in your entry js file:
 
 ```bash
-npm i edge-animate -S
+npm i web-animate -S
 ```
 
 ```js
-import 'edge-animate'
+import 'web-animate'
 ```
 
 ## Demos
 
-- [Edge Animate Playback Controls](https://codepen.io/notoriousb1t/pen/mpLQZP/)
+- [Web Animate Playback Controls](https://codepen.io/animationatwork/pen/mpLQZP/)
 
 ## Contributions
 
-Contributions are welcome.  Please create an [issue](https://github.com/notoriousb1t/edge-animate/issues) prior to adding a Pull Request.  See below on how to run this project locally.
+Contributions are welcome.  Please create an [issue](https://github.com/animationatwork/web-animate/issues) prior to adding a Pull Request.  See below on how to run this project locally.
 
 ### How to get the project running locally
 
@@ -72,7 +72,7 @@ Contributions are welcome.  Please create an [issue](https://github.com/notoriou
 
 ### Before you submit a Pull Request for code
 
-- Submit an [issue](https://github.com/notoriousb1t/edge-animate/issues)
+- Submit an [issue](https://github.com/animationatwork/web-animate/issues)
 - Ensure at least one new unit test exists to cover the feature/bug
 - Ensure new files are formatted property (4 space indentation)
 
