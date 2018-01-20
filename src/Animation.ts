@@ -12,7 +12,7 @@ function now() {
 /**
  * IAnimation + private fields
  */
-interface IEdgeAnimation extends IAnimation {
+interface IWebAnimation extends IAnimation {
     _time: number
     _totalTime: number
     _startTime: number
@@ -37,7 +37,7 @@ export function Animation(element: HTMLElement, keyframes: IKeyframe[], timing: 
     timing.endDelay = timing.endDelay || 0
 
     // cast self as internal version of Animation
-    const self = this as IEdgeAnimation
+    const self = this as IWebAnimation
     self._element = element
     self._rate = 1
     self.pending = false
@@ -76,24 +76,24 @@ export function Animation(element: HTMLElement, keyframes: IKeyframe[], timing: 
 }
 
 Animation.prototype = {
-    get currentTime(this: IEdgeAnimation): number {
+    get currentTime(this: IWebAnimation): number {
         return updateTiming(this)._time
     },
-    set currentTime(this: IEdgeAnimation, val: number) {
+    set currentTime(this: IWebAnimation, val: number) {
         this._time = val
         updateTiming(this)
     },
-    get playbackRate(this: IEdgeAnimation): number {
+    get playbackRate(this: IWebAnimation): number {
         return updateTiming(this)._rate
     },
     set playbackRate(val: number) {
         this._rate = val
         updateTiming(this)
     },
-    get playState(this: IEdgeAnimation): PlayState {
+    get playState(this: IWebAnimation): PlayState {
         return updateTiming(this)._state
     },
-    cancel(this: IEdgeAnimation): void {
+    cancel(this: IWebAnimation): void {
         const self = this
         self._time = self._startTime = _
         self._state = idle
@@ -102,7 +102,7 @@ Animation.prototype = {
         // tslint:disable-next-line:no-unused-expression
         self.oncancel && self.oncancel()
     },
-    finish(this: IEdgeAnimation) {
+    finish(this: IWebAnimation) {
         const self = this
         moveToFinish(self)
         updateTiming(self)
@@ -110,7 +110,7 @@ Animation.prototype = {
         // tslint:disable-next-line:no-unused-expression
         self.onfinish && self.onfinish()
     },
-    play(this: IEdgeAnimation): void {
+    play(this: IWebAnimation): void {
         const self = this
 
         // update time if applicable
@@ -127,24 +127,24 @@ Animation.prototype = {
         this._state = running
         updateTiming(self)
     },
-    pause(this: IEdgeAnimation): void {
+    pause(this: IWebAnimation): void {
         const self = this
         if (self._state !== finished) {
             self._state = paused
         }
         updateTiming(this)
     },
-    reverse(this: IEdgeAnimation): void {
+    reverse(this: IWebAnimation): void {
         this._rate *= -1
         updateTiming(this)
     }
 }
-function clearFinishTimeout(self: IEdgeAnimation) {
+function clearFinishTimeout(self: IWebAnimation) {
     // clear last timeout
     // tslint:disable-next-line:no-unused-expression
     self._finishTaskId && clearTimeout(self._finishTaskId)
 }
-function updateElement(self: IEdgeAnimation) {
+function updateElement(self: IWebAnimation) {
     const el = self._element
     const state = self._state
 
@@ -168,7 +168,7 @@ function updateElement(self: IEdgeAnimation) {
         console.log(-toLocalTime(self) + milliseconds, state, self.id)
     }
 }
-function toLocalTime(self: IEdgeAnimation) {
+function toLocalTime(self: IWebAnimation) {
     // get progression on this iteration
     const timing = self._timing
 
@@ -185,7 +185,7 @@ function toLocalTime(self: IEdgeAnimation) {
     return self._totalTime < localTime ? self._totalTime : localTime < 0 ? 0 : localTime
 }
 
-function moveToFinish(self: IEdgeAnimation) {
+function moveToFinish(self: IWebAnimation) {
     const isForwards = self._rate >= 0
 
     // check if state has transitioned to finish
@@ -203,7 +203,7 @@ function moveToFinish(self: IEdgeAnimation) {
     self._startTime = _
 }
 
-function updateTiming(self: IEdgeAnimation) {
+function updateTiming(self: IWebAnimation) {
     const startTime = self._startTime
     const state = self._state
 
@@ -236,7 +236,7 @@ function updateTiming(self: IEdgeAnimation) {
     return self
 }
 
-function updateScheduler(self: IEdgeAnimation) {
+function updateScheduler(self: IWebAnimation) {
     if (self._state !== running) {
         // if the animation isn't running, there is no point in scheduling the finish
         return

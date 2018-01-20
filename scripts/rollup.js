@@ -89,8 +89,8 @@ const write = (bundle, options) => {
 // core bundle
 rollup.rollup(config({ input: 'src/index.ts' })).then(bundle => {
     write(bundle, {
-        name: 'edge',
-        file: 'dist/edge-animate.js',
+        name: 'webAnimate',
+        file: 'dist/web-animate.js',
         format: 'iife'
     })
 })
@@ -98,8 +98,8 @@ rollup.rollup(config({ input: 'src/index.ts' })).then(bundle => {
 // core minified bundle
 rollup.rollup(config({ input: 'src/index.ts', minify: true })).then(bundle => {
     write(bundle, {
-        name: 'edge',
-        file: 'dist/edge-animate.min.js',
+        name: 'webAnimate',
+        file: 'dist/web-animate.min.js',
         format: 'iife'
     })
 })

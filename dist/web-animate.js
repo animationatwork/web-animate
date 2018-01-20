@@ -1,4 +1,4 @@
-var edge = (function (exports) {
+var webAnimate = (function (exports) {
 'use strict';
 
 var upperCasePattern = /[A-Z]/g;
