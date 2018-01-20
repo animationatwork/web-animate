@@ -10,17 +10,17 @@ This library automatically polyfills on browsers without Element.prototype.anima
 
 ```js
 // force rendering of CSS keyframes immediately
-webAnimate.forceRender()
+WebAnimate.forceRender()
 
 // call animate directly
-webAnimate.animate(el, keyframes, timing)
+WebAnimate.animate(el, keyframes, timing)
 
 // manually replaces animate()
 // Call only if you want to forcibly overwrite Element.prototype.animate()
-webAnimate.polyfill()
+WebAnimate.polyfill()
 
 // use this to determine if the animate() has been overridden
-if (webAnimate.isPolyfilled()) {
+if (WebAnimate.isPolyfilled()) {
     // do something
 }
 ```

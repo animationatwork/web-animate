@@ -89,7 +89,7 @@ const write = (bundle, options) => {
 // core bundle
 rollup.rollup(config({ input: 'src/index.ts' })).then(bundle => {
     write(bundle, {
-        name: 'webAnimate',
+        name: 'WebAnimate',
         file: 'dist/web-animate.js',
         format: 'iife'
     })
@@ -98,7 +98,7 @@ rollup.rollup(config({ input: 'src/index.ts' })).then(bundle => {
 // core minified bundle
 rollup.rollup(config({ input: 'src/index.ts', minify: true })).then(bundle => {
     write(bundle, {
-        name: 'webAnimate',
+        name: 'WebAnimate',
         file: 'dist/web-animate.min.js',
         format: 'iife'
     })
