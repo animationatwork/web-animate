@@ -1,6 +1,6 @@
-import { IElementAnimate, IEffectTiming, IAnimation, IKeyframe } from './types';
-import { Animation } from './Animation';
-import { forceRender } from './styles';
+import { IElementAnimate, IEffectTiming, IAnimation, IKeyframe } from './types'
+import { Animation } from './Animation'
+export { forceRender } from './styles'
 
 declare global {
     // tslint:disable-next-line:interface-name
@@ -9,16 +9,21 @@ declare global {
     }
 }
 
-// pass force render outward
-export { forceRender }
+function animateElement(keyframes: IKeyframe[], timings: IEffectTiming): IAnimation {
+    return new (Animation as any)(this as HTMLElement, keyframes, timings)
+}
 
-export let isPolyflled = false
+
+export function animate(el: Element, keyframes: IKeyframe[], timings: IEffectTiming) {
+    return animateElement.call(el, keyframes, timings)
+}
 
 export function polyfill() {
-    isPolyflled = true
-    Element.prototype.animate = function (keyframes: IKeyframe[], timings: IEffectTiming): IAnimation {
-        return new (Animation as any)(this as HTMLElement, keyframes, timings)
-    }
+    Element.prototype.animate = animateElement
+}
+
+export function isPolyflled() {
+    return Element.prototype.animate === animateElement
 }
 
 // polyfill older browsers automatically

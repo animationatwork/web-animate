@@ -262,19 +262,26 @@ function updateScheduler(self) {
     self._finishTaskId = setTimeout(self.finish, _remaining);
 }
 
-exports.isPolyflled = false;
+function animateElement(keyframes, timings) {
+    return new Animation(this, keyframes, timings);
+}
+function animate(el, keyframes, timings) {
+    return animateElement.call(el, keyframes, timings);
+}
 function polyfill() {
-    exports.isPolyflled = true;
-    Element.prototype.animate = function (keyframes, timings) {
-        return new Animation(this, keyframes, timings);
-    };
+    Element.prototype.animate = animateElement;
+}
+function isPolyflled() {
+    return Element.prototype.animate === animateElement;
 }
 if (typeof Element.prototype.animate !== 'undefined') {
     polyfill();
 }
 
-exports.forceRender = forceRender;
+exports.animate = animate;
 exports.polyfill = polyfill;
+exports.isPolyflled = isPolyflled;
+exports.forceRender = forceRender;
 
 return exports;
 

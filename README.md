@@ -12,12 +12,15 @@ This library automatically polyfills on browsers without Element.prototype.anima
 // force rendering of CSS keyframes immediately
 edge.forceRender()
 
+// call animate directly
+edge.animate(el, keyframes, timing)
+
 // manually replaces animate()
 // Call only if you want to forcibly overwrite Element.prototype.animate()
 edge.polyfill()
 
 // use this to determine if the animate() has been overridden
-if (edge.isPolyfilled) {
+if (edge.isPolyfilled()) {
     // do something
 }
 ```
@@ -39,6 +42,10 @@ npm i edge-animate -S
 ```js
 import 'edge-animate'
 ```
+
+## Demos
+
+- [Edge Animate Playback Controls](https://codepen.io/notoriousb1t/pen/mpLQZP/)
 
 ## Contributions
 
