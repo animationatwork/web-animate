@@ -104,10 +104,8 @@ Animation.prototype = {
     },
     finish(this: IEdgeAnimation) {
         const self = this
-        self._time = self._rate >= 0 ? self._totalTime : 0
-        if (self._state !== finished) {
-            updateTiming(self)
-        }
+        moveToFinish(self)
+        updateTiming(self)
         clearFinishTimeout(self)
         // tslint:disable-next-line:no-unused-expression
         self.onfinish && self.onfinish()
@@ -131,7 +129,9 @@ Animation.prototype = {
     },
     pause(this: IEdgeAnimation): void {
         const self = this
-        self._state = paused
+        if (self._state !== finished) {
+            self._state = paused
+        }
         updateTiming(this)
     },
     reverse(this: IEdgeAnimation): void {
@@ -139,7 +139,6 @@ Animation.prototype = {
         updateTiming(this)
     }
 }
-
 function clearFinishTimeout(self: IEdgeAnimation) {
     // clear last timeout
     // tslint:disable-next-line:no-unused-expression
@@ -154,6 +153,10 @@ function updateElement(self: IEdgeAnimation) {
     if (state === idle) {
         style.animationName = style.animationPlayState = style.animationDelay = ''
     } else {
+        if (!isFinite(self._time)) {
+            self._time = self._rate >= 0 ? 0 : self._totalTime
+        }
+
         style.animationName = ''
         // tslint:disable-next-line:no-unused-expression
         void el.offsetWidth
@@ -168,6 +171,7 @@ function updateElement(self: IEdgeAnimation) {
 function toLocalTime(self: IEdgeAnimation) {
     // get progression on this iteration
     const timing = self._timing
+
     const timeLessDelay = self._time - (timing.delay + timing.endDelay)
     let localTime = timeLessDelay % timing.duration
     if (self._reverse) {
@@ -181,43 +185,57 @@ function toLocalTime(self: IEdgeAnimation) {
     return self._totalTime < localTime ? self._totalTime : localTime < 0 ? 0 : localTime
 }
 
+function moveToFinish(self: IEdgeAnimation) {
+    const isForwards = self._rate >= 0
+
+    // check if state has transitioned to finish
+    self._state = finished
+    if (isForwards && self._isFillForwards) {
+        // move playhead to the end (minus a little bit to prevent setting to 0)
+        self._time = self._totalTime - epsilon
+    }
+    if (!isForwards && self._isFillBackwards) {
+        // move playhead to the end (plus a little bit to prevent setting to total time)
+        self._time = 0 + epsilon
+    }
+
+    // remove startTime since the "timer" isn't running
+    self._startTime = _
+}
+
 function updateTiming(self: IEdgeAnimation) {
     const startTime = self._startTime
     const state = self._state
-    let next = now()
-    let time = Math.round(self._time + (next - startTime))
-    self._time = time
 
-    const isPaused = state === paused || state === finished
-    if (!isPaused) {
+    let next = now()
+    let time: number
+    const isFinished = self._state === finished
+    const isPaused = state === paused
+
+    if (!isFinished) {
+        time = Math.round(self._time + (next - startTime))
+        self._time = time
+    }
+
+    if (!isPaused && !isFinished) {
         self._startTime = next
 
         const isForwards = self._rate >= 0
         if ((isForwards && time >= self._totalTime) || (!isForwards && time <= 0)) {
-            // check if state has transitioned to finish
-            self._state = finished
-            if (isForwards && self._isFillForwards) {
-                // move playhead to the end (minus a little bit to prevent setting to 0)
-                self._time = self._totalTime - epsilon
-            }
-            if (!isForwards && self._isFillBackwards) {
-                // move playhead to the end (plus a little bit to prevent setting to total time)
-                self._time = 0 + epsilon
-            }
-
-            // remove startTime since the "timer" isn't running
-            self._startTime = _
+            self.finish()
+            return
         }
     }
 
     updateElement(self)
     clearFinishTimeout(self)
 
-    if (!isPaused) {
+    if (!isPaused && !isFinished) {
         updateScheduler(self)
     }
     return self
 }
+
 function updateScheduler(self: IEdgeAnimation) {
     if (self._state !== running) {
         // if the animation isn't running, there is no point in scheduling the finish

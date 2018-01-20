@@ -56,9 +56,9 @@ var allKeyframes = {};
 var taskId;
 var styleElement;
 function renderStyles() {
-    taskId = taskId || setTimeout(renderStylesheet, 0);
+    taskId = taskId || setTimeout(forceRender, 0);
 }
-function renderStylesheet() {
+function forceRender() {
     taskId = 0;
     if (!styleElement) {
         styleElement = document.createElement('style');
@@ -150,10 +150,8 @@ Animation.prototype = {
     },
     finish: function () {
         var self = this;
-        self._time = self._rate >= 0 ? self._totalTime : 0;
-        if (self._state !== finished) {
-            updateTiming(self);
-        }
+        moveToFinish(self);
+        updateTiming(self);
         clearFinishTimeout(self);
         self.onfinish && self.onfinish();
     },
@@ -174,7 +172,9 @@ Animation.prototype = {
     },
     pause: function () {
         var self = this;
-        self._state = paused;
+        if (self._state !== finished) {
+            self._state = paused;
+        }
         updateTiming(this);
     },
     reverse: function () {
@@ -193,6 +193,9 @@ function updateElement(self) {
         style.animationName = style.animationPlayState = style.animationDelay = '';
     }
     else {
+        if (!isFinite(self._time)) {
+            self._time = self._rate >= 0 ? 0 : self._totalTime;
+        }
         style.animationName = '';
         void el.offsetWidth;
         style.animationDelay = -toLocalTime(self) + milliseconds;
@@ -213,30 +216,39 @@ function toLocalTime(self) {
     }
     return self._totalTime < localTime ? self._totalTime : localTime < 0 ? 0 : localTime;
 }
+function moveToFinish(self) {
+    var isForwards = self._rate >= 0;
+    self._state = finished;
+    if (isForwards && self._isFillForwards) {
+        self._time = self._totalTime - epsilon;
+    }
+    if (!isForwards && self._isFillBackwards) {
+        self._time = 0 + epsilon;
+    }
+    self._startTime = _;
+}
 function updateTiming(self) {
     var startTime = self._startTime;
     var state = self._state;
     var next = now();
-    var time = Math.round(self._time + (next - startTime));
-    self._time = time;
-    var isPaused = state === paused || state === finished;
-    if (!isPaused) {
+    var time;
+    var isFinished = self._state === finished;
+    var isPaused = state === paused;
+    if (!isFinished) {
+        time = Math.round(self._time + (next - startTime));
+        self._time = time;
+    }
+    if (!isPaused && !isFinished) {
         self._startTime = next;
         var isForwards = self._rate >= 0;
         if ((isForwards && time >= self._totalTime) || (!isForwards && time <= 0)) {
-            self._state = finished;
-            if (isForwards && self._isFillForwards) {
-                self._time = self._totalTime - epsilon;
-            }
-            if (!isForwards && self._isFillBackwards) {
-                self._time = 0 + epsilon;
-            }
-            self._startTime = _;
+            self.finish();
+            return;
         }
     }
     updateElement(self);
     clearFinishTimeout(self);
-    if (!isPaused) {
+    if (!isPaused && !isFinished) {
         updateScheduler(self);
     }
     return self;
@@ -250,16 +262,19 @@ function updateScheduler(self) {
     self._finishTaskId = setTimeout(self.finish, _remaining);
 }
 
-if (typeof Element.prototype.animate !== 'undefined') {
+exports.isPolyflled = false;
+function polyfill() {
+    exports.isPolyflled = true;
     Element.prototype.animate = function (keyframes, timings) {
-        return animate(this, keyframes, timings);
+        return new Animation(this, keyframes, timings);
     };
 }
-function animate(el, keyframes, timings) {
-    return new Animation(el, keyframes, timings);
+if (typeof Element.prototype.animate !== 'undefined') {
+    polyfill();
 }
 
-exports.animate = animate;
+exports.forceRender = forceRender;
+exports.polyfill = polyfill;
 
 return exports;
 

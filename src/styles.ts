@@ -7,13 +7,13 @@ let styleElement: HTMLStyleElement
  * Schedules next render of styles
  */
 function renderStyles() {
-    taskId = taskId || setTimeout(renderStylesheet, 0)
+    taskId = taskId || setTimeout(forceRender, 0)
 }
 
 /**
  * Writes out new keyframes to the stylesheet
  */
-function renderStylesheet() {
+export function forceRender() {
     taskId = 0
     if (!styleElement) {
         styleElement = document.createElement('style')

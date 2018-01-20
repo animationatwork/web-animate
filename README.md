@@ -2,7 +2,43 @@
 
 >A lightweight polyfill for the Web Animations API. (WAAPI)
 
-This project aims to provide a lightweight polyfill to WAAPI that leverages CSS Keyframes and does not use requestAnimationFrame.
+This project aims to provide a lightweight polyfill to WAAPI that leverages CSS Keyframes and does not call requestAnimationFrame on every frame.
+
+## How to use
+
+This library automatically polyfills on browsers without Element.prototype.animate(). There are a few functions that can be called manually however:
+
+```js
+// force rendering of CSS keyframes immediately
+edge.forceRender()
+
+// manually replaces animate()
+// Call only if you want to forcibly overwrite Element.prototype.animate()
+edge.polyfill()
+
+// use this to determine if the animate() has been overridden
+if (edge.isPolyfilled) {
+    // do something
+}
+```
+
+## Setup
+
+Include this in your head:
+
+```html
+<script href="https://unpkg.com/edge-animate/dist/edge-animate.min.js"></script>
+```
+
+Or download with npm and import this in your entry js file:
+
+```bash
+npm i edge-animate -S
+```
+
+```js
+import 'edge-animate'
+```
 
 ## Contributions
 
