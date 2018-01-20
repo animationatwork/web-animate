@@ -1,7 +1,7 @@
 {
-    "author": "Christopher Wallis",
+    "author": "",
     "bugs": {
-        "url": "https://github.com/notoriousb1t/edge-animate/issues"
+        "url": "https://github.com/animationatwork/web-animate/issues"
     },
     "description": "",
     "devDependencies": {
@@ -23,7 +23,7 @@
         "typescript": "^2.6.2",
         "uglify-es": "^3.3.7"
     },
-    "homepage": "https://github.com/notoriousb1t/edge-animate#readme",
+    "homepage": "https://github.com/animationatwork/web-animate#readme",
     "jest": {
         "moduleFileExtensions": [
             "ts",
@@ -36,10 +36,10 @@
     },
     "license": "MIT",
     "main": "index.js",
-    "name": "edge-animate",
+    "name": "web-animate",
     "repository": {
         "type": "git",
-        "url": "https://github.com/notoriousb1t/edge-animate"
+        "url": "https://github.com/animationatwork/web-animate"
     },
     "scripts": {
         "build": "npm run build:node && npm run build:es2015 && npm run rollup",
