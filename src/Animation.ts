@@ -2,12 +2,9 @@ import { IKeyframe, IEffectTiming, IAnimation, PlayState } from './types'
 import { waapiToString } from './waapiToString'
 import { insertKeyframes } from './styles'
 import { _, finished, idle, paused, milliseconds, running } from './constants'
+import { now, nextFrame } from './globals'
 
 const epsilon = 0.0001
-
-function now() {
-    return performance.now()
-}
 
 /**
  * IAnimation + private fields
@@ -27,7 +24,12 @@ interface IWebAnimation extends IAnimation {
     _isFillBackwards: boolean
 }
 
-export function Animation(element: HTMLElement, keyframes: IKeyframe[], timing: IEffectTiming) {
+export function Animation(element: HTMLElement, keyframes: IKeyframe[], timingOrDuration: IEffectTiming | number) {
+    const timing =
+        typeof timingOrDuration === 'number'
+            ? { duration: timingOrDuration as number }
+            : (timingOrDuration as IEffectTiming)
+
     // set default options
     timing.direction = timing.direction || 'normal'
     timing.easing = timing.easing || 'linear'
@@ -77,7 +79,9 @@ export function Animation(element: HTMLElement, keyframes: IKeyframe[], timing: 
 
 Animation.prototype = {
     get currentTime(this: IWebAnimation): number {
-        return updateTiming(this)._time
+        const time = updateTiming(this)._time
+        // tslint:disable-next-line:no-null-keyword
+        return isFinite(time) ? time : null
     },
     set currentTime(this: IWebAnimation, val: number) {
         this._time = val
@@ -164,8 +168,6 @@ function updateElement(self: IWebAnimation) {
         style.animationDelay = -toLocalTime(self) + milliseconds
         style.animationPlayState = state === finished || state === paused ? paused : state
         style.animationName = self.id
-
-        console.log(-toLocalTime(self) + milliseconds, state, self.id)
     }
 }
 function toLocalTime(self: IWebAnimation) {
@@ -190,13 +192,20 @@ function moveToFinish(self: IWebAnimation) {
 
     // check if state has transitioned to finish
     self._state = finished
-    if (isForwards && self._isFillForwards) {
-        // move playhead to the end (minus a little bit to prevent setting to 0)
-        self._time = self._totalTime - epsilon
-    }
-    if (!isForwards && self._isFillBackwards) {
-        // move playhead to the end (plus a little bit to prevent setting to total time)
-        self._time = 0 + epsilon
+    if (isForwards) {
+        if (self._isFillForwards) {
+            // move playhead to the end (minus a little bit to prevent setting to 0)
+            self._time = self._totalTime - epsilon
+        } else {
+            self._time = 0
+        }
+    } else {
+        if (self._isFillBackwards) {
+            // move playhead to the end (plus a little bit to prevent setting to total time)
+            self._time = 0 + epsilon
+        } else {
+            self._time = self._totalTime
+        }
     }
 
     // remove startTime since the "timer" isn't running
@@ -244,5 +253,5 @@ function updateScheduler(self: IWebAnimation) {
     // recalculate time remaining and set a timeout for it
     const isForwards = self._rate >= 0
     const _remaining = isForwards ? self._totalTime - self._time : self._time
-    self._finishTaskId = setTimeout(self.finish, _remaining)
+    self._finishTaskId = nextFrame(self.finish, _remaining)
 }

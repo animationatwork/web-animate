@@ -9,13 +9,14 @@ declare global {
     }
 }
 
-function animateElement(keyframes: IKeyframe[], timings: IEffectTiming): IAnimation {
-    return new (Animation as any)(this as HTMLElement, keyframes, timings)
+function animateElement(keyframes: IKeyframe[], timingOrDuration: IEffectTiming | number): IAnimation {
+    return new (Animation as any)(this as HTMLElement, keyframes, timingOrDuration)
 }
 
-
-export function animate(el: Element, keyframes: IKeyframe[], timings: IEffectTiming) {
-    return animateElement.call(el, keyframes, timings)
+export function animate(el: Element, keyframes: IKeyframe[], duration: number): IAnimation
+export function animate(el: Element, keyframes: IKeyframe[], timing: IEffectTiming): IAnimation
+export function animate(el: Element, keyframes: IKeyframe[], timingOrDuration: IEffectTiming | number): IAnimation {
+    return animateElement.call(el, keyframes, timingOrDuration)
 }
 
 export function polyfill() {

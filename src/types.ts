@@ -1,6 +1,8 @@
 export type PlayState = 'idle' | 'running' | 'paused' | 'finished'
 export interface IElementAnimate {
-    (keyframes: IKeyframe[], timings: IEffectTiming): IAnimation
+    (keyframes: IKeyframe[], duration: number): IAnimation
+    (keyframes: IKeyframe[], timing: IEffectTiming): IAnimation
+    (keyframes: IKeyframe[], timingOrDuration: IEffectTiming | number): IAnimation
 }
 
 export interface IAnimation {

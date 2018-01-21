@@ -52,11 +52,23 @@ function waapiToString(keyframes) {
     return rules.join('\n');
 }
 
+var global = window || global;
+var lastTime;
+var taskId$1;
+function resetTime() {
+    lastTime = 0;
+}
+function now() {
+    taskId$1 = taskId$1 || nextFrame(resetTime);
+    return (lastTime = lastTime || (global.performance || Date).now());
+}
+var nextFrame = function (fn, time) { return setTimeout(fn, time || 0); };
+
 var allKeyframes = {};
 var taskId;
 var styleElement;
 function renderStyles() {
-    taskId = taskId || setTimeout(forceRender, 0);
+    taskId = taskId || nextFrame(forceRender);
 }
 function forceRender() {
     taskId = 0;
@@ -89,10 +101,10 @@ function insertKeyframes(rules) {
 }
 
 var epsilon = 0.0001;
-function now() {
-    return performance.now();
-}
-function Animation(element, keyframes, timing) {
+function Animation(element, keyframes, timingOrDuration) {
+    var timing = typeof timingOrDuration === 'number'
+        ? { duration: timingOrDuration }
+        : timingOrDuration;
     timing.direction = timing.direction || 'normal';
     timing.easing = timing.easing || 'linear';
     timing.iterations = timing.iterations || 1;
@@ -201,7 +213,6 @@ function updateElement(self) {
         style.animationDelay = -toLocalTime(self) + milliseconds;
         style.animationPlayState = state === finished || state === paused ? paused : state;
         style.animationName = self.id;
-        console.log(-toLocalTime(self) + milliseconds, state, self.id);
     }
 }
 function toLocalTime(self) {
@@ -259,14 +270,14 @@ function updateScheduler(self) {
     }
     var isForwards = self._rate >= 0;
     var _remaining = isForwards ? self._totalTime - self._time : self._time;
-    self._finishTaskId = setTimeout(self.finish, _remaining);
+    self._finishTaskId = nextFrame(self.finish, _remaining);
 }
 
-function animateElement(keyframes, timings) {
-    return new Animation(this, keyframes, timings);
+function animateElement(keyframes, timingOrDuration) {
+    return new Animation(this, keyframes, timingOrDuration);
 }
-function animate(el, keyframes, timings) {
-    return animateElement.call(el, keyframes, timings);
+function animate(el, keyframes, timingOrDuration) {
+    return animateElement.call(el, keyframes, timingOrDuration);
 }
 function polyfill() {
     Element.prototype.animate = animateElement;

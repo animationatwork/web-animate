@@ -1,3 +1,5 @@
+import { nextFrame } from './globals';
+
 const allKeyframes: Record<string, string> = {}
 
 let taskId: any
@@ -7,7 +9,7 @@ let styleElement: HTMLStyleElement
  * Schedules next render of styles
  */
 function renderStyles() {
-    taskId = taskId || setTimeout(forceRender, 0)
+    taskId = taskId || nextFrame(forceRender)
 }
 
 /**
