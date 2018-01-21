@@ -136,7 +136,8 @@ function Animation(element, keyframes, timingOrDuration) {
 }
 Animation.prototype = {
     get currentTime() {
-        return updateTiming(this)._time;
+        var time = updateTiming(this)._time;
+        return isFinite(time) ? time : null;
     },
     set currentTime(val) {
         this._time = val;
@@ -230,11 +231,21 @@ function toLocalTime(self) {
 function moveToFinish(self) {
     var isForwards = self._rate >= 0;
     self._state = finished;
-    if (isForwards && self._isFillForwards) {
-        self._time = self._totalTime - epsilon;
+    if (isForwards) {
+        if (self._isFillForwards) {
+            self._time = self._totalTime - epsilon;
+        }
+        else {
+            self._time = 0;
+        }
     }
-    if (!isForwards && self._isFillBackwards) {
-        self._time = 0 + epsilon;
+    else {
+        if (self._isFillBackwards) {
+            self._time = 0 + epsilon;
+        }
+        else {
+            self._time = self._totalTime;
+        }
     }
     self._startTime = _;
 }
