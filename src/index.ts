@@ -1,6 +1,5 @@
 import { IElementAnimate, IEffectTiming, IAnimation, IKeyframe } from './types'
 import { Animation } from './Animation'
-export { forceRender } from './styles'
 
 declare global {
     // tslint:disable-next-line:interface-name
@@ -23,7 +22,7 @@ export function polyfill() {
     Element.prototype.animate = animateElement
 }
 
-export function isPolyflled() {
+export function isPolyfilled() {
     return Element.prototype.animate === animateElement
 }
 

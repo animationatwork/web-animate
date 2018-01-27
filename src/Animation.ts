@@ -56,11 +56,12 @@ export function Animation(element: HTMLElement, keyframes: IKeyframe[], timingOr
 
     // set animation options on element
     const style = element.style
-    style.animationTimingFunction = timing.easing
-    style.animationDuration = timing.duration + milliseconds
-    style.animationIterationCount = timing.iterations === Infinity ? 'infinite' : timing.iterations + ''
-    style.animationDirection = timing.direction
-    style.animationFillMode = timing.fill
+    style.animationTimingFunction = style.webkitAnimationTimingFunction = timing.easing
+    style.animationDuration = style.webkitAnimationDuration = timing.duration + milliseconds
+    style.animationIterationCount = style.webkitAnimationIterationCount =
+        timing.iterations === Infinity ? 'infinite' : timing.iterations + ''
+    style.animationDirection = style.webkitAnimationDirection = timing.direction
+    style.animationFillMode = style.webkitAnimationFillMode = timing.fill
 
     // calculate total time and set timing
     self._timing = timing
@@ -165,9 +166,12 @@ function updateElement(self: IWebAnimation) {
         // tslint:disable-next-line:no-unused-expression
         void el.offsetWidth
 
-        style.animationDelay = -toLocalTime(self) + milliseconds
-        style.animationPlayState = state === finished || state === paused ? paused : state
-        style.animationName = self.id
+        const playState = state === finished || state === paused ? paused : state
+        const delay = -toLocalTime(self) + milliseconds
+
+        style.animationDelay = style.webkitAnimationDelay = delay
+        style.animationPlayState = style.webkitAnimationPlayState = playState
+        style.animationName = style.webkitAnimationName = self.id
     }
 }
 function toLocalTime(self: IWebAnimation) {

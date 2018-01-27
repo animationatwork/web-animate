@@ -52,37 +52,8 @@ function waapiToString(keyframes) {
     return rules.join('\n');
 }
 
-var global = window || global;
-var lastTime;
-var taskId$1;
-function resetTime() {
-    lastTime = 0;
-}
-function now() {
-    taskId$1 = taskId$1 || nextFrame(resetTime);
-    return (lastTime = lastTime || (global.performance || Date).now());
-}
-var nextFrame = function (fn, time) { return setTimeout(fn, time || 0); };
-
-var allKeyframes = {};
-var taskId;
-var styleElement;
-function renderStyles() {
-    taskId = taskId || nextFrame(forceRender);
-}
-function forceRender() {
-    taskId = 0;
-    if (!styleElement) {
-        styleElement = document.createElement('style');
-        styleElement.setAttribute('rel', 'stylesheet');
-        document.head.appendChild(styleElement);
-    }
-    var contents = '';
-    for (var key in allKeyframes) {
-        contents += '@keyframes ' + key + '{' + allKeyframes[key] + '}';
-    }
-    styleElement.innerHTML = contents;
-}
+var sheet;
+var rulesAdded = {};
 function stringHash(str) {
     var value = 5381;
     var len = str.length;
@@ -93,12 +64,30 @@ function stringHash(str) {
 }
 function insertKeyframes(rules) {
     var hash = 'ea_' + stringHash(rules);
-    if (!allKeyframes[hash]) {
-        allKeyframes[hash] = rules;
-        renderStyles();
+    if (!rulesAdded[hash]) {
+        rulesAdded[hash] = 1;
+        if (!sheet) {
+            var styleElement = document.createElement('style');
+            styleElement.setAttribute('rel', 'stylesheet');
+            document.head.appendChild(styleElement);
+            sheet = styleElement.sheet;
+        }
+        sheet.insertRule("@keyframes " + hash + "{" + rules + "}", sheet.cssRules.length);
     }
     return hash;
 }
+
+var global = window || global;
+var lastTime;
+var taskId;
+function resetTime() {
+    lastTime = 0;
+}
+function now() {
+    taskId = taskId || nextFrame(resetTime);
+    return (lastTime = lastTime || (global.performance || Date).now());
+}
+var nextFrame = function (fn, time) { return setTimeout(fn, time || 0); };
 
 var epsilon = 0.0001;
 function Animation(element, keyframes, timingOrDuration) {
@@ -122,11 +111,12 @@ function Animation(element, keyframes, timingOrDuration) {
     var rules = waapiToString(keyframes);
     self.id = insertKeyframes(rules);
     var style = element.style;
-    style.animationTimingFunction = timing.easing;
-    style.animationDuration = timing.duration + milliseconds;
-    style.animationIterationCount = timing.iterations === Infinity ? 'infinite' : timing.iterations + '';
-    style.animationDirection = timing.direction;
-    style.animationFillMode = timing.fill;
+    style.animationTimingFunction = style.webkitAnimationTimingFunction = timing.easing;
+    style.animationDuration = style.webkitAnimationDuration = timing.duration + milliseconds;
+    style.animationIterationCount = style.webkitAnimationIterationCount =
+        timing.iterations === Infinity ? 'infinite' : timing.iterations + '';
+    style.animationDirection = style.webkitAnimationDirection = timing.direction;
+    style.animationFillMode = style.webkitAnimationFillMode = timing.fill;
     self._timing = timing;
     self._totalTime = (timing.delay || 0) + timing.duration * timing.iterations + (timing.endDelay || 0);
     self._yoyo = timing.direction.indexOf('alternate') !== -1;
@@ -211,9 +201,11 @@ function updateElement(self) {
         }
         style.animationName = '';
         void el.offsetWidth;
-        style.animationDelay = -toLocalTime(self) + milliseconds;
-        style.animationPlayState = state === finished || state === paused ? paused : state;
-        style.animationName = self.id;
+        var playState = state === finished || state === paused ? paused : state;
+        var delay = -toLocalTime(self) + milliseconds;
+        style.animationDelay = style.webkitAnimationDelay = delay;
+        style.animationPlayState = style.webkitAnimationPlayState = playState;
+        style.animationName = style.webkitAnimationName = self.id;
     }
 }
 function toLocalTime(self) {
@@ -293,7 +285,7 @@ function animate(el, keyframes, timingOrDuration) {
 function polyfill() {
     Element.prototype.animate = animateElement;
 }
-function isPolyflled() {
+function isPolyfilled() {
     return Element.prototype.animate === animateElement;
 }
 if (typeof Element.prototype.animate !== 'undefined') {
@@ -302,8 +294,7 @@ if (typeof Element.prototype.animate !== 'undefined') {
 
 exports.animate = animate;
 exports.polyfill = polyfill;
-exports.isPolyflled = isPolyflled;
-exports.forceRender = forceRender;
+exports.isPolyfilled = isPolyfilled;
 
 return exports;
 
