@@ -9,6 +9,7 @@ let taskId: any
  */
 function resetTime() {
     lastTime = 0
+    taskId = 0
 }
 
 /**

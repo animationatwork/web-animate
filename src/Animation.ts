@@ -1,7 +1,7 @@
 import { IKeyframe, IEffectTiming, IAnimation, PlayState } from './types'
 import { waapiToString } from './waapiToString'
 import { insertKeyframes } from './styles'
-import { _, finished, idle, paused, milliseconds, running } from './constants'
+import { _, finished, idle, paused, running } from './constants'
 import { now, nextFrame } from './globals'
 
 const epsilon = 0.0001
@@ -20,8 +20,8 @@ interface IWebAnimation extends IAnimation {
     _yoyo: boolean
     _reverse: boolean
     _finishTaskId: any
-    _isFillForwards: boolean
-    _isFillBackwards: boolean
+    _fillB: boolean
+    _fillF: boolean
 }
 
 export function Animation(element: HTMLElement, keyframes: IKeyframe[], timingOrDuration: IEffectTiming | number) {
@@ -42,26 +42,16 @@ export function Animation(element: HTMLElement, keyframes: IKeyframe[], timingOr
     const self = this as IWebAnimation
     self._element = element
     self._rate = 1
-    self.pending = false
 
     // determine how css will handle filling time values
     const fill = timing.fill
     const fillBoth = fill === 'both'
-    self._isFillForwards = fillBoth || fill === 'forwards'
-    self._isFillBackwards = fillBoth || fill === 'backwards'
+    self._fillB = fillBoth || fill === 'forwards'
+    self._fillF = fillBoth || fill === 'backwards'
 
     // insert animation definition
     const rules = waapiToString(keyframes)
     self.id = insertKeyframes(rules)
-
-    // set animation options on element
-    const style = element.style
-    style.animationTimingFunction = style.webkitAnimationTimingFunction = timing.easing
-    style.animationDuration = style.webkitAnimationDuration = timing.duration + milliseconds
-    style.animationIterationCount = style.webkitAnimationIterationCount =
-        timing.iterations === Infinity ? 'infinite' : timing.iterations + ''
-    style.animationDirection = style.webkitAnimationDirection = timing.direction
-    style.animationFillMode = style.webkitAnimationFillMode = timing.fill
 
     // calculate total time and set timing
     self._timing = timing
@@ -85,66 +75,101 @@ Animation.prototype = {
         return isFinite(time) ? time : null
     },
     set currentTime(this: IWebAnimation, val: number) {
-        this._time = val
-        updateTiming(this)
+        const self = this
+        self._time = val
+        updateTiming(self)
+        scheduleOnFinish(self)
+        updateElement(self)
     },
     get playbackRate(this: IWebAnimation): number {
         return updateTiming(this)._rate
     },
     set playbackRate(val: number) {
-        this._rate = val
-        updateTiming(this)
+        const self = this
+        self._rate = val
+        updateTiming(self)
+        scheduleOnFinish(self)
+        updateElement(self)
     },
     get playState(this: IWebAnimation): PlayState {
         return updateTiming(this)._state
     },
     cancel(this: IWebAnimation): void {
         const self = this
+        updateTiming(self)
+
         self._time = self._startTime = _
         self._state = idle
+
+        clearOnFinish(self)
         updateElement(self)
-        clearFinishTimeout(self)
         // tslint:disable-next-line:no-unused-expression
         self.oncancel && self.oncancel()
     },
     finish(this: IWebAnimation) {
         const self = this
-        moveToFinish(self)
         updateTiming(self)
-        clearFinishTimeout(self)
+
+        const start = 0 + epsilon
+        const end = self._totalTime - epsilon
+
+        // move state to finish
+        self._state = finished
+        // move time to the end
+        self._time = self._rate >= 0 ? (self._fillB ? end : start) : self._fillF ? start : end
+        // remove startTime since the "timer" isn't running
+        self._startTime = _
+        self.pending = false
+
+        clearOnFinish(self)
+        updateElement(self)
         // tslint:disable-next-line:no-unused-expression
         self.onfinish && self.onfinish()
     },
     play(this: IWebAnimation): void {
         const self = this
-
-        // update time if applicable
-        const isForwards = self._rate >= 0
-        const isCanceled = self._time === _
-        const time = isCanceled ? _ : Math.round(self._time)
-        if (isForwards && (isCanceled || time >= self._totalTime)) {
-            self._time = 0
-        } else if (!isForwards && (isCanceled || time <= 0)) {
-            self._time = self._totalTime
-        }
-
-        self._startTime = now()
-        this._state = running
         updateTiming(self)
+
+        const isForwards = self._rate >= 0
+        let time = self._time === _ ? _ : Math.round(self._time)
+
+        // prettier-ignore
+        time = isForwards && (time === _ || time >= self._totalTime) ? 0
+            : !isForwards && (time === _ || time <= 0)
+                ? self._totalTime : time
+
+        // update state as running
+        self._state = running
+        // ensure time is appropriate for a active state
+        self._time = time
+        // set starting time to now
+        self._startTime = now()
+
+        // update timing model
+        scheduleOnFinish(self)
+        updateElement(self)
     },
     pause(this: IWebAnimation): void {
         const self = this
-        if (self._state !== finished) {
-            self._state = paused
+        if (self._state === finished) {
+            // pausing on finish should do nothing
+            return
         }
-        updateTiming(this)
+        updateTiming(self)
+
+        // ensure time is appropriate for a active state
+        self._state = paused
+        self._startTime = _
+
+        clearOnFinish(self)
+        updateElement(self)
     },
     reverse(this: IWebAnimation): void {
-        this._rate *= -1
-        updateTiming(this)
+        this.playbackRate = this._rate * -1
     }
 }
-function clearFinishTimeout(self: IWebAnimation) {
+
+function clearOnFinish(self: IWebAnimation) {
     // clear last timeout
     // tslint:disable-next-line:no-unused-expression
     self._finishTaskId && clearTimeout(self._finishTaskId)
@@ -161,19 +186,47 @@ function updateElement(self: IWebAnimation) {
         if (!isFinite(self._time)) {
             self._time = self._rate >= 0 ? 0 : self._totalTime
         }
-
-        style.animationName = ''
-        // tslint:disable-next-line:no-unused-expression
-        void el.offsetWidth
-
-        const playState = state === finished || state === paused ? paused : state
-        const delay = -toLocalTime(self) + milliseconds
-
-        style.animationDelay = style.webkitAnimationDelay = delay
-        style.animationPlayState = style.webkitAnimationPlayState = playState
-        style.animationName = style.webkitAnimationName = self.id
+        updateAnimation(self)
     }
 }
+
+function updateAnimation(self: IWebAnimation) {
+    const { _state: s, _timing: t } = self
+    const playState = s === finished || s === paused ? paused : s
+    const delay = -toLocalTime(self)
+
+    const animation =
+        `${self._totalTime}ms` +
+        ` ${t.easing}` +
+        ` ${delay}ms` +
+        ` ${t.iterations}` +
+        ` ${t.direction}` +
+        ` ${t.fill}` +
+        ` ${playState}` +
+        ` ${self.id}`
+
+    const el = self._element
+    const style = el.style
+
+    /* The following statements work to force a repaint without flickering  */
+    // store last visibility value so we can restore it after paint
+    const lastVisibility = style.visibility
+
+    // set visibility to hidden and remove animation attribute
+    style.visibility = 'hidden'
+    style.animation = style.webkitAnimation = ''
+
+    // force a repaint
+    // tslint:disable-next-line:no-unused-expression
+    void el.offsetWidth
+
+    // set new animation values
+    style.animation = style.webkitAnimation = animation
+
+    // restore visibility
+    style.visibility = lastVisibility
+}
+
 function toLocalTime(self: IWebAnimation) {
     // get progression on this iteration
     const timing = self._timing
@@ -191,69 +244,41 @@ function toLocalTime(self: IWebAnimation) {
     return self._totalTime < localTime ? self._totalTime : localTime < 0 ? 0 : localTime
 }
 
-function moveToFinish(self: IWebAnimation) {
-    const isForwards = self._rate >= 0
-
-    // check if state has transitioned to finish
-    self._state = finished
-    if (isForwards) {
-        if (self._isFillForwards) {
-            // move playhead to the end (minus a little bit to prevent setting to 0)
-            self._time = self._totalTime - epsilon
-        } else {
-            self._time = 0
-        }
-    } else {
-        if (self._isFillBackwards) {
-            // move playhead to the end (plus a little bit to prevent setting to total time)
-            self._time = 0 + epsilon
-        } else {
-            self._time = self._totalTime
-        }
-    }
-
-    // remove startTime since the "timer" isn't running
-    self._startTime = _
-}
-
 function updateTiming(self: IWebAnimation) {
     const startTime = self._startTime
     const state = self._state
 
-    let next = now()
-    let time: number
-    const isFinished = self._state === finished
-    const isPaused = state === paused
+    if (!self.pending && state === running) {
+        // mark as pending to prevent stack overflows from finish()
+        self.pending = true
 
-    if (!isFinished) {
+        let next = now()
+        let time: number
+
         time = Math.round(self._time + (next - startTime))
         self._time = time
-    }
-
-    if (!isPaused && !isFinished) {
         self._startTime = next
 
         const isForwards = self._rate >= 0
         if ((isForwards && time >= self._totalTime) || (!isForwards && time <= 0)) {
             self.finish()
-            return
         }
+        // unmark as pending
+        self.pending = false
     }
 
-    updateElement(self)
-    clearFinishTimeout(self)
-
-    if (!isPaused && !isFinished) {
-        updateScheduler(self)
-    }
     return self
 }
 
-function updateScheduler(self: IWebAnimation) {
+function scheduleOnFinish(self: IWebAnimation) {
     if (self._state !== running) {
         // if the animation isn't running, there is no point in scheduling the finish
         return
     }
+
+    // clear out existing finish timeout
+    clearOnFinish(self)
+
     // recalculate time remaining and set a timeout for it
     const isForwards = self._rate >= 0
     const _remaining = isForwards ? self._totalTime - self._time : self._time

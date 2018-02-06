@@ -1,23 +1,73 @@
-import { animate } from '../src/index'
-import { IEffectTiming } from '../src/types'
+import { animate } from '../../src/index'
+import { IEffectTiming } from '../../src/types'
+import { wait } from '../tools/timing';
 
-test('finish() from idle', () => {
+test('pause() from running', async (done) => {
+    const el = document.createElement('div')
+    document.body.appendChild(el)
+
+    const keyframes = [{ opacity: 0 }, { opacity: 1 }]
+    const player = animate(el, keyframes, 100)
+
+    await wait(50)
+    player.pause()
+
+    // it is hard to use await to test actual play time,
+    // so we have to use a range.
+    expect(player.currentTime).toBeGreaterThan(20)
+    expect(player.currentTime).toBeLessThan(80)
+    expect(player.playState).toEqual('paused')
+    expect(player.playbackRate).toEqual(1)
+    expect(player.pending).toEqual(false)
+    expect(player.id).toBeTruthy()
+    done()
+})
+
+
+test('pause() from running => play() => pause()', async (done) => {
+    const el = document.createElement('div')
+    document.body.appendChild(el)
+
+    const keyframes = [{ opacity: 0 }, { opacity: 1 }]
+    const player = animate(el, keyframes, 200)
+
+    await wait(25)
+    player.pause()
+    player.play()
+
+    await wait(25)
+    player.pause()
+
+    // it is hard to use await to test actual play time,
+    // so we have to use a range.
+    expect(player.currentTime).toBeGreaterThan(20)
+    expect(player.currentTime).toBeLessThan(80)
+    expect(player.playState).toEqual('paused')
+    expect(player.playbackRate).toEqual(1)
+    expect(player.pending).toEqual(false)
+    expect(player.id).toBeTruthy()
+
+
+    done()
+})
+
+test('pause() from idle', () => {
     const el = document.createElement('div')
     document.body.appendChild(el)
 
     const keyframes = [{ opacity: 0 }, { opacity: 1 }]
     const player = animate(el, keyframes, 100)
     player.cancel()
-    player.finish()
+    player.pause()
 
-    expect(Math.round(player.currentTime)).toEqual(0)
-    expect(player.playState).toEqual('finished')
+    expect(player.currentTime).toEqual(0)
+    expect(player.playState).toEqual('paused')
     expect(player.playbackRate).toEqual(1)
     expect(player.pending).toEqual(false)
     expect(player.id).toBeTruthy()
 })
 
-test('finish() from paused', () => {
+test('pause() from paused', () => {
     const el = document.createElement('div')
     document.body.appendChild(el)
 
@@ -25,33 +75,16 @@ test('finish() from paused', () => {
     const player = animate(el, keyframes, 100)
     player.pause()
     player.currentTime = 50
-    player.finish()
+    player.pause()
 
-    expect(Math.round(player.currentTime)).toEqual(0)
-    expect(player.playState).toEqual('finished')
+    expect(player.currentTime).toEqual(50)
+    expect(player.playState).toEqual('paused')
     expect(player.playbackRate).toEqual(1)
     expect(player.pending).toEqual(false)
     expect(player.id).toBeTruthy()
 })
 
-test('finish() from finished', () => {
-    const el = document.createElement('div')
-    document.body.appendChild(el)
-
-    const keyframes = [{ opacity: 0 }, { opacity: 1 }]
-    const timing: IEffectTiming = { duration: 100 }
-    const player = animate(el, keyframes, timing)
-    player.finish()
-    player.finish()
-
-    expect(Math.round(player.currentTime)).toBe(0)
-    expect(player.playState).toEqual('finished')
-    expect(player.playbackRate).toEqual(1)
-    expect(player.pending).toEqual(false)
-    expect(player.id).toBeTruthy()
-})
-
-test('finish() from finished (fill: forwards)', () => {
+test('pause() from finished', () => {
     const el = document.createElement('div')
     document.body.appendChild(el)
 
@@ -59,7 +92,7 @@ test('finish() from finished (fill: forwards)', () => {
     const timing: IEffectTiming = { duration: 100, fill: 'forwards' }
     const player = animate(el, keyframes, timing)
     player.finish()
-    player.finish()
+    player.pause()
 
     expect(Math.round(player.currentTime)).toBe(100)
     expect(player.playState).toEqual('finished')
@@ -68,35 +101,19 @@ test('finish() from finished (fill: forwards)', () => {
     expect(player.id).toBeTruthy()
 })
 
-test('finish() from finished (fill: both)', () => {
-    const el = document.createElement('div')
-    document.body.appendChild(el)
-
-    const keyframes = [{ opacity: 0 }, { opacity: 1 }]
-    const timing: IEffectTiming = { duration: 100, fill: 'both' }
-    const player = animate(el, keyframes, timing)
-    player.finish()
-    player.finish()
-
-    expect(Math.round(player.currentTime)).toBe(100)
-    expect(player.playState).toEqual('finished')
-    expect(player.playbackRate).toEqual(1)
-    expect(player.pending).toEqual(false)
-    expect(player.id).toBeTruthy()
-})
-
-test('finish() from running', () => {
+test('pause() from running', () => {
     const el = document.createElement('div')
     document.body.appendChild(el)
 
     const keyframes = [{ opacity: 0 }, { opacity: 1 }]
     const player = animate(el, keyframes, 100)
     player.currentTime = 50
-    player.finish()
+    player.pause()
 
-    expect(player.currentTime).toBe(0)
-    expect(player.playState).toEqual('finished')
+    expect(player.currentTime).toBe(50)
+    expect(player.playState).toEqual('paused')
     expect(player.playbackRate).toEqual(1)
     expect(player.pending).toEqual(false)
     expect(player.id).toBeTruthy()
 })
+

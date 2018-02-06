@@ -7,7 +7,6 @@ var msPattern = /^ms-/;
 var _ = undefined;
 var idle = 'idle';
 var finished = 'finished';
-var milliseconds = 'ms';
 var paused = 'paused';
 var running = 'running';
 
@@ -82,6 +81,7 @@ var lastTime;
 var taskId;
 function resetTime() {
     lastTime = 0;
+    taskId = 0;
 }
 function now() {
     taskId = taskId || nextFrame(resetTime);
@@ -103,20 +103,12 @@ function Animation(element, keyframes, timingOrDuration) {
     var self = this;
     self._element = element;
     self._rate = 1;
-    self.pending = false;
     var fill = timing.fill;
     var fillBoth = fill === 'both';
-    self._isFillForwards = fillBoth || fill === 'forwards';
-    self._isFillBackwards = fillBoth || fill === 'backwards';
+    self._fillB = fillBoth || fill === 'forwards';
+    self._fillF = fillBoth || fill === 'backwards';
     var rules = waapiToString(keyframes);
     self.id = insertKeyframes(rules);
-    var style = element.style;
-    style.animationTimingFunction = style.webkitAnimationTimingFunction = timing.easing;
-    style.animationDuration = style.webkitAnimationDuration = timing.duration + milliseconds;
-    style.animationIterationCount = style.webkitAnimationIterationCount =
-        timing.iterations === Infinity ? 'infinite' : timing.iterations + '';
-    style.animationDirection = style.webkitAnimationDirection = timing.direction;
-    style.animationFillMode = style.webkitAnimationFillMode = timing.fill;
     self._timing = timing;
     self._totalTime = (timing.delay || 0) + timing.duration * timing.iterations + (timing.endDelay || 0);
     self._yoyo = timing.direction.indexOf('alternate') !== -1;
@@ -130,62 +122,77 @@ Animation.prototype = {
         return isFinite(time) ? time : null;
     },
     set currentTime(val) {
-        this._time = val;
-        updateTiming(this);
+        var self = this;
+        self._time = val;
+        updateTiming(self);
+        scheduleOnFinish(self);
+        updateElement(self);
     },
     get playbackRate() {
         return updateTiming(this)._rate;
     },
     set playbackRate(val) {
-        this._rate = val;
-        updateTiming(this);
+        var self = this;
+        self._rate = val;
+        updateTiming(self);
+        scheduleOnFinish(self);
+        updateElement(self);
     },
     get playState() {
         return updateTiming(this)._state;
     },
     cancel: function () {
         var self = this;
+        updateTiming(self);
         self._time = self._startTime = _;
         self._state = idle;
+        clearOnFinish(self);
         updateElement(self);
-        clearFinishTimeout(self);
         self.oncancel && self.oncancel();
     },
     finish: function () {
         var self = this;
-        moveToFinish(self);
         updateTiming(self);
-        clearFinishTimeout(self);
+        var start = 0 + epsilon;
+        var end = self._totalTime - epsilon;
+        self._state = finished;
+        self._time = self._rate >= 0 ? (self._fillB ? end : start) : self._fillF ? start : end;
+        self._startTime = _;
+        self.pending = false;
+        clearOnFinish(self);
+        updateElement(self);
         self.onfinish && self.onfinish();
     },
     play: function () {
         var self = this;
-        var isForwards = self._rate >= 0;
-        var isCanceled = self._time === _;
-        var time = isCanceled ? _ : Math.round(self._time);
-        if (isForwards && (isCanceled || time >= self._totalTime)) {
-            self._time = 0;
-        }
-        else if (!isForwards && (isCanceled || time <= 0)) {
-            self._time = self._totalTime;
-        }
-        self._startTime = now();
-        this._state = running;
         updateTiming(self);
+        var isForwards = self._rate >= 0;
+        var time = self._time === _ ? _ : Math.round(self._time);
+        time = isForwards && (time === _ || time >= self._totalTime) ? 0
+            : !isForwards && (time === _ || time <= 0)
+                ? self._totalTime : time;
+        self._state = running;
+        self._time = time;
+        self._startTime = now();
+        scheduleOnFinish(self);
+        updateElement(self);
     },
     pause: function () {
         var self = this;
-        if (self._state !== finished) {
-            self._state = paused;
+        if (self._state === finished) {
+            return;
         }
-        updateTiming(this);
+        updateTiming(self);
+        self._state = paused;
+        self._startTime = _;
+        clearOnFinish(self);
+        updateElement(self);
     },
     reverse: function () {
-        this._rate *= -1;
-        updateTiming(this);
+        this.playbackRate = this._rate * -1;
     }
 };
-function clearFinishTimeout(self) {
+function clearOnFinish(self) {
     self._finishTaskId && clearTimeout(self._finishTaskId);
 }
 function updateElement(self) {
@@ -199,14 +206,29 @@ function updateElement(self) {
         if (!isFinite(self._time)) {
             self._time = self._rate >= 0 ? 0 : self._totalTime;
         }
-        style.animationName = '';
-        void el.offsetWidth;
-        var playState = state === finished || state === paused ? paused : state;
-        var delay = -toLocalTime(self) + milliseconds;
-        style.animationDelay = style.webkitAnimationDelay = delay;
-        style.animationPlayState = style.webkitAnimationPlayState = playState;
-        style.animationName = style.webkitAnimationName = self.id;
+        updateAnimation(self);
     }
+}
+function updateAnimation(self) {
+    var s = self._state, t = self._timing;
+    var playState = s === finished || s === paused ? paused : s;
+    var delay = -toLocalTime(self);
+    var animation = self._totalTime + "ms" +
+        (" " + t.easing) +
+        (" " + delay + "ms") +
+        (" " + t.iterations) +
+        (" " + t.direction) +
+        (" " + t.fill) +
+        (" " + playState) +
+        (" " + self.id);
+    var el = self._element;
+    var style = el.style;
+    var lastVisibility = style.visibility;
+    style.visibility = 'hidden';
+    style.animation = style.webkitAnimation = '';
+    void el.offsetWidth;
+    style.animation = style.webkitAnimation = animation;
+    style.visibility = lastVisibility;
 }
 function toLocalTime(self) {
     var timing = self._timing;
@@ -220,57 +242,29 @@ function toLocalTime(self) {
     }
     return self._totalTime < localTime ? self._totalTime : localTime < 0 ? 0 : localTime;
 }
-function moveToFinish(self) {
-    var isForwards = self._rate >= 0;
-    self._state = finished;
-    if (isForwards) {
-        if (self._isFillForwards) {
-            self._time = self._totalTime - epsilon;
-        }
-        else {
-            self._time = 0;
-        }
-    }
-    else {
-        if (self._isFillBackwards) {
-            self._time = 0 + epsilon;
-        }
-        else {
-            self._time = self._totalTime;
-        }
-    }
-    self._startTime = _;
-}
 function updateTiming(self) {
     var startTime = self._startTime;
     var state = self._state;
-    var next = now();
-    var time;
-    var isFinished = self._state === finished;
-    var isPaused = state === paused;
-    if (!isFinished) {
+    if (!self.pending && state === running) {
+        self.pending = true;
+        var next = now();
+        var time = void 0;
         time = Math.round(self._time + (next - startTime));
         self._time = time;
-    }
-    if (!isPaused && !isFinished) {
         self._startTime = next;
         var isForwards = self._rate >= 0;
         if ((isForwards && time >= self._totalTime) || (!isForwards && time <= 0)) {
             self.finish();
-            return;
         }
-    }
-    updateElement(self);
-    clearFinishTimeout(self);
-    if (!isPaused && !isFinished) {
-        updateScheduler(self);
+        self.pending = false;
     }
     return self;
 }
-function updateScheduler(self) {
+function scheduleOnFinish(self) {
     if (self._state !== running) {
         return;
     }
+    clearOnFinish(self);
     var isForwards = self._rate >= 0;
     var _remaining = isForwards ? self._totalTime - self._time : self._time;
     self._finishTaskId = nextFrame(self.finish, _remaining);

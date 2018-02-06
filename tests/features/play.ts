@@ -1,5 +1,5 @@
-import { animate } from '../src/index'
-import { IEffectTiming } from '../src/types';
+import { animate } from '../../src/index'
+import { IEffectTiming } from '../../src/types';
 
 test('play() from idle', () => {
     const el = document.createElement('div')
