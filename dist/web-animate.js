@@ -89,6 +89,43 @@ function now() {
 }
 var nextFrame = function (fn, time) { return setTimeout(fn, time || 0); };
 
+var ANIMATION_PROPS = [
+    'Name',
+    'Duration',
+    'Delay',
+    'IterationCount',
+    'Direction',
+    'FillMode',
+    'PlayState',
+    'TimingFunction'
+];
+var ANIMATION = 'animation';
+var WEBKIT = 'webkitAnimation';
+var MS = 'msAnimation';
+function enqueueElement(el) {
+    var animations = el._animations;
+    var style = el.style;
+    var lastVisibility = style.visibility;
+    style.visibility = 'hidden';
+    for (var i = 0, ilen = ANIMATION_PROPS.length; i < ilen; i++) {
+        var key = ANIMATION_PROPS[i];
+        style[ANIMATION + key] = style[WEBKIT + key] = style[MS + key] = '';
+    }
+    void el.offsetWidth;
+    for (var i = 0, ilen = ANIMATION_PROPS.length; i < ilen; i++) {
+        var key = ANIMATION_PROPS[i];
+        var value = void 0;
+        for (var name in animations) {
+            var animation = animations[name];
+            if (animation) {
+                value = (value ? ',' : '') + animation[key];
+            }
+        }
+        style[ANIMATION + key] = style[WEBKIT + key] = style[MS + key] = value;
+    }
+    style.visibility = lastVisibility;
+}
+
 var epsilon = 0.0001;
 function Animation(element, keyframes, timingOrDuration) {
     var timing = typeof timingOrDuration === 'number'
@@ -212,23 +249,25 @@ function updateElement(self) {
 function updateAnimation(self) {
     var s = self._state, t = self._timing;
     var playState = s === finished || s === paused ? paused : s;
-    var delay = -toLocalTime(self);
-    var animation = self._totalTime + "ms" +
-        (" " + t.easing) +
-        (" " + delay + "ms") +
-        (" " + t.iterations) +
-        (" " + t.direction) +
-        (" " + t.fill) +
-        (" " + playState) +
-        (" " + self.id);
     var el = self._element;
-    var style = el.style;
-    var lastVisibility = style.visibility;
-    style.visibility = 'hidden';
-    style.animation = style.webkitAnimation = '';
-    void el.offsetWidth;
-    style.animation = style.webkitAnimation = animation;
-    style.visibility = lastVisibility;
+    var animations = el._animations || (el._animations = {});
+    var a = animations[self.id] || (animations[self.id] = {});
+    if (s === idle) {
+        for (var key in a) {
+            a[key] = _;
+        }
+    }
+    else {
+        a.Name = self.id;
+        a.Duration = self._totalTime + 'ms';
+        a.Delay = -toLocalTime(self) + 'ms';
+        a.TimingFunction = t.easing;
+        a.IterationCount = isFinite(t.iterations) ? t.iterations + '' : 'infinite';
+        a.Direction = t.direction;
+        a.FillMode = t.fill;
+        a.PlayState = playState;
+    }
+    enqueueElement(el);
 }
 function toLocalTime(self) {
     var timing = self._timing;

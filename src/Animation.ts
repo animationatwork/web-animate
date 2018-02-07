@@ -1,10 +1,12 @@
 import { IKeyframe, IEffectTiming, IAnimation, PlayState } from './types'
 import { waapiToString } from './waapiToString'
-import { insertKeyframes } from './styles'
+import { insertKeyframes } from './keyframes'
 import { _, finished, idle, paused, running } from './constants'
 import { now, nextFrame } from './globals'
+import { IHTMLElement2, enqueueElement, IHTMLAnimation } from './animations';
 
 const epsilon = 0.0001
+
 
 /**
  * IAnimation + private fields
@@ -13,7 +15,7 @@ interface IWebAnimation extends IAnimation {
     _time: number
     _totalTime: number
     _startTime: number
-    _element: HTMLElement
+    _element: IHTMLElement2
     _timing: IEffectTiming
     _rate: number
     _state: PlayState
@@ -40,7 +42,7 @@ export function Animation(element: HTMLElement, keyframes: IKeyframe[], timingOr
 
     // cast self as internal version of Animation
     const self = this as IWebAnimation
-    self._element = element
+    self._element = element as IHTMLElement2
     self._rate = 1
 
     // determine how css will handle filling time values
@@ -193,39 +195,29 @@ function updateElement(self: IWebAnimation) {
 function updateAnimation(self: IWebAnimation) {
     const { _state: s, _timing: t } = self
     const playState = s === finished || s === paused ? paused : s
-    const delay = -toLocalTime(self)
 
-    const animation =
-        `${self._totalTime}ms` +
-        ` ${t.easing}` +
-        ` ${delay}ms` +
-        ` ${t.iterations}` +
-        ` ${t.direction}` +
-        ` ${t.fill}` +
-        ` ${playState}` +
-        ` ${self.id}`
 
     const el = self._element
-    const style = el.style
+    const animations = el._animations || (el._animations = {});
+    const a = animations[self.id] || (animations[self.id] = {} as IHTMLAnimation)
+    if (s === idle) {
+        for (let key in a) {
+            a[key] = _
+        }
+    } else {
+        a.Name = self.id
+        a.Duration = self._totalTime + 'ms'
+        a.Delay = -toLocalTime(self) + 'ms'
+        a.TimingFunction = t.easing
+        a.IterationCount = isFinite(t.iterations) ? t.iterations + '' : 'infinite'
+        a.Direction = t.direction
+        a.FillMode = t.fill
+        a.PlayState = playState
+    }
 
-    /* The following statements work to force a repaint without flickering  */
-    // store last visibility value so we can restore it after paint
-    const lastVisibility = style.visibility
-
-    // set visibility to hidden and remove animation attribute
-    style.visibility = 'hidden'
-    style.animation = style.webkitAnimation = ''
-
-    // force a repaint
-    // tslint:disable-next-line:no-unused-expression
-    void el.offsetWidth
-
-    // set new animation values
-    style.animation = style.webkitAnimation = animation
-
-    // restore visibility
-    style.visibility = lastVisibility
+    enqueueElement(el)
 }
+
 
 function toLocalTime(self: IWebAnimation) {
     // get progression on this iteration
