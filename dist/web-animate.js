@@ -321,7 +321,7 @@ function polyfill() {
 function isPolyfilled() {
     return Element.prototype.animate === animateElement;
 }
-if (typeof Element.prototype.animate !== 'undefined') {
+if (typeof Element.prototype.animate === 'undefined') {
     polyfill();
 }
 
