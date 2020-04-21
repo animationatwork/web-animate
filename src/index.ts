@@ -27,6 +27,6 @@ export function isPolyfilled() {
 }
 
 // polyfill older browsers automatically
-if (typeof Element.prototype.animate !== 'undefined') {
+if (typeof Element.prototype.animate === 'undefined') {
     polyfill()
 }
