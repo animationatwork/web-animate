@@ -30,7 +30,7 @@ if (WebAnimate.isPolyfilled()) {
 Include this in your head:
 
 ```html
-<script href="https://unpkg.com/web-animate/dist/web-animate.min.js"></script>
+<script src="https://unpkg.com/web-animate/dist/web-animate.min.js"></script>
 ```
 
 Or download with npm and import this in your entry js file:
